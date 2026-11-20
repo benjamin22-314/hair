@@ -1,0 +1,16 @@
+{
+  "name": "Hair Salon Party",
+  "short_name": "Hair Salon",
+  "description": "Cut, colour, curl, wash, add glasses and style hair for friendly customers and a monster!",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fff5fb",
+  "theme_color": "#e84c8a",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
