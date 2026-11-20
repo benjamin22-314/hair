@@ -38,6 +38,7 @@ export class HairSalonEngine {
     this.customer = null;
     this.strands = [];
     this.stylePreset = 'loose';
+    this.presetState = this.defaultPresetState();
     this.glasses = null;
     this.accessories = [];
     this.activeAccUid = null;
@@ -69,9 +70,23 @@ export class HairSalonEngine {
     });
   }
 
+  defaultPresetState() {
+    return {
+      leftColor: null,
+      rightColor: null,
+      topColor: null,
+      leftGlitter: 0,
+      rightGlitter: 0,
+      topGlitter: 0,
+      pigtailScale: 1.0,
+      ponytailScale: 1.0
+    };
+  }
+
   loadCustomer(customer) {
     this.customer = customer;
     this.stylePreset = 'loose';
+    this.presetState = this.defaultPresetState();
     this.glasses = customer.defaultGlasses ? { ...customer.defaultGlasses } : null;
     this.accessories = [];
     this.particles = [];
@@ -152,6 +167,7 @@ export class HairSalonEngine {
   getSnapshot() {
     return {
       stylePreset: this.stylePreset,
+      presetState: { ...this.presetState },
       glasses: this.glasses ? { ...this.glasses } : null,
       accessories: this.accessories.map((a) => ({ ...a })),
       strands: this.strands.map((s) => ({
@@ -169,6 +185,7 @@ export class HairSalonEngine {
   restoreSnapshot(snap) {
     if (!snap) return;
     this.stylePreset = snap.stylePreset;
+    this.presetState = snap.presetState ? { ...snap.presetState } : this.defaultPresetState();
     this.glasses = snap.glasses ? { ...snap.glasses } : null;
     this.accessories = snap.accessories.map((a) => ({ ...a }));
     snap.strands.forEach((st, i) => {
@@ -209,6 +226,15 @@ export class HairSalonEngine {
     this.strands.forEach((s, i) => {
       s.color = hex === 'rainbow' ? RAINBOW_HEX[i % RAINBOW_HEX.length] : hex;
     });
+    if (hex === 'rainbow') {
+      this.presetState.leftColor = RAINBOW_HEX[0];
+      this.presetState.rightColor = RAINBOW_HEX[4];
+      this.presetState.topColor = RAINBOW_HEX[5];
+    } else {
+      this.presetState.leftColor = hex;
+      this.presetState.rightColor = hex;
+      this.presetState.topColor = hex;
+    }
     for (let i = 0; i < 24; i++) {
       this.spawnSparkle(
         this.cx + (Math.random() - 0.5) * 340,
@@ -224,6 +250,8 @@ export class HairSalonEngine {
       s.length = Math.min(1.0, s.length + 0.35);
       s.swayVel += (Math.random() - 0.5) * 16;
     });
+    this.presetState.pigtailScale = Math.min(1.15, this.presetState.pigtailScale + 0.25);
+    this.presetState.ponytailScale = Math.min(1.15, this.presetState.ponytailScale + 0.25);
     for (let i = 0; i < 18; i++) {
       this.spawnSparkle(
         this.cx + (Math.random() - 0.5) * 320,
@@ -294,6 +322,55 @@ export class HairSalonEngine {
   applyTool(tool, x, y, dx, dy, options = {}) {
     let touched = false;
     const radius = tool === 'dryer' ? 125 : (tool === 'clippers' ? 74 : 70);
+    const isUpdo = this.stylePreset === 'buns' || this.stylePreset === 'pigtails' || this.stylePreset === 'ponytail';
+
+    // Direct hit-testing for updo hairpieces (buns, pigtails, high ponytail)
+    if (isUpdo) {
+      const hitZones = [];
+      if (this.stylePreset === 'buns') {
+        if (Math.hypot(x - (this.cx - 124), y - (this.cy - 134)) < 78) hitZones.push('left');
+        if (Math.hypot(x - (this.cx + 124), y - (this.cy - 134)) < 78) hitZones.push('right');
+      } else if (this.stylePreset === 'pigtails') {
+        const ph = 245 * this.presetState.pigtailScale;
+        if (x > this.cx - 285 && x < this.cx - 125 && y > this.cy - 60 && y < this.cy - 20 + ph) hitZones.push('left');
+        if (x > this.cx + 125 && x < this.cx + 285 && y > this.cy - 60 && y < this.cy - 20 + ph) hitZones.push('right');
+      } else if (this.stylePreset === 'ponytail') {
+        if (Math.hypot(x - (this.cx - 85), y - (this.cy - 95)) < 155 * this.presetState.ponytailScale) hitZones.push('top');
+      }
+
+      if (hitZones.length) {
+        touched = true;
+        hitZones.forEach((zone) => {
+          const colKey = zone + 'Color';
+          const glitKey = zone + 'Glitter';
+          if (tool === 'dye') {
+            const col = options.color || '#ff5ca8';
+            const pick = col === 'rainbow' ? RAINBOW_HEX[Math.floor(Math.random() * RAINBOW_HEX.length)] : col;
+            this.presetState[colKey] = pick;
+            if (Math.random() < 0.35) this.spawnSparkle(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32, pick);
+          } else if (tool === 'glitter') {
+            this.presetState[glitKey] = Math.min(1, this.presetState[glitKey] + 0.25);
+            if (Math.random() < 0.45) this.spawnSparkle(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 40, '#fff4a3');
+            this.setExpression('proud', 0.6);
+          } else if (tool === 'shower') {
+            this.presetState[glitKey] = Math.max(0, this.presetState[glitKey] - 0.15);
+          } else if ((tool === 'scissors' || tool === 'clippers') && (this.stylePreset === 'pigtails' || this.stylePreset === 'ponytail')) {
+            const scaleKey = this.stylePreset === 'pigtails' ? 'pigtailScale' : 'ponytailScale';
+            const prev = this.presetState[scaleKey];
+            this.presetState[scaleKey] = Math.max(0.45, prev - (tool === 'clippers' ? 0.06 : 0.035));
+            if (prev - this.presetState[scaleKey] > 0.01) {
+              const clipCol = this.presetState[colKey] || this.getDominantHairColor(zone === 'top' ? 'all' : zone);
+              this.spawnClipping(x, y, clipCol);
+              this.setExpression('surprised', 0.6);
+            }
+          } else if (tool === 'grow' && (this.stylePreset === 'pigtails' || this.stylePreset === 'ponytail')) {
+            const scaleKey = this.stylePreset === 'pigtails' ? 'pigtailScale' : 'ponytailScale';
+            this.presetState[scaleKey] = Math.min(1.15, this.presetState[scaleKey] + 0.04);
+            if (Math.random() < 0.3) this.spawnSparkle(x, y, '#6ef7c8');
+          }
+        });
+      }
+    }
 
     this.strands.forEach((s, idx) => {
       const pt = this.getStrandPoints(s);
@@ -309,6 +386,10 @@ export class HairSalonEngine {
       const dRoot = Math.hypot(s.ax - x, s.ay - y);
 
       if (d < radius) {
+        // Don't cut tucked-away back strands while wearing an updo preset
+        if (isUpdo && s.layer === 'back' && (tool === 'scissors' || tool === 'clippers')) {
+          return;
+        }
         touched = true;
         const strength = 1 - d / radius;
 
@@ -641,15 +722,31 @@ export class HairSalonEngine {
   drawPresetBack(ctx) {
     if (this.stylePreset === 'loose' || this.stylePreset === 'mohawk') return;
     ctx.save();
-    const leftCol = this.getDominantHairColor('left');
-    const rightCol = this.getDominantHairColor('right');
-    const topCol = this.getDominantHairColor('all');
+    const leftCol = this.presetState.leftColor || this.getDominantHairColor('left');
+    const rightCol = this.presetState.rightColor || this.getDominantHairColor('right');
+    const topCol = this.presetState.topColor || this.getDominantHairColor('all');
     const sway = Math.sin(this.time * 2.0) * 6;
+
+    const drawPresetGlitter = (gx, gy, spreadX, spreadY, amount, seed) => {
+      if (amount <= 0.08) return;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, amount);
+      for (let i = 0; i < 8; i++) {
+        const px = gx + Math.sin(seed + i * 2.1) * spreadX;
+        const py = gy + Math.cos(seed + i * 1.7) * spreadY;
+        const tw = 0.55 + 0.45 * Math.sin(this.time * 7 + i + seed);
+        ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#fff28c';
+        ctx.beginPath();
+        ctx.arc(px, py, 3.8 * tw, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    };
 
     if (this.stylePreset === 'buns') {
       [
-        { x: this.cx - 124, y: this.cy - 134, dir: -1, col: leftCol },
-        { x: this.cx + 124, y: this.cy - 134, dir: 1, col: rightCol }
+        { x: this.cx - 124, y: this.cy - 134, dir: -1, col: leftCol, glit: this.presetState.leftGlitter, seed: 1 },
+        { x: this.cx + 124, y: this.cy - 134, dir: 1, col: rightCol, glit: this.presetState.rightGlitter, seed: 5 }
       ].forEach((b) => {
         // Main fluffy bun
         ctx.fillStyle = b.col;
@@ -675,6 +772,8 @@ export class HairSalonEngine {
         ctx.arc(b.x - 6, b.y - 6, 44, Math.PI * 1.15, Math.PI * 1.62);
         ctx.stroke();
 
+        drawPresetGlitter(b.x, b.y, 36, 36, b.glit, b.seed);
+
         // Cute scrunchie band where bun meets head
         ctx.save();
         ctx.translate(b.x - b.dir * 34, b.y + 42);
@@ -689,15 +788,16 @@ export class HairSalonEngine {
         ctx.restore();
       });
     } else if (this.stylePreset === 'pigtails') {
+      const pScale = this.presetState.pigtailScale;
       [
-        { x: this.cx - 146, y: this.cy - 34, dir: -1, col: leftCol },
-        { x: this.cx + 146, y: this.cy - 34, dir: 1, col: rightCol }
+        { x: this.cx - 146, y: this.cy - 34, dir: -1, col: leftCol, glit: this.presetState.leftGlitter, seed: 2 },
+        { x: this.cx + 146, y: this.cy - 34, dir: 1, col: rightCol, glit: this.presetState.rightGlitter, seed: 7 }
       ].forEach((p) => {
         // Draw 3 layered bouncy locks per pigtail
         const locks = [
-          { ox: 0, oy: 0, w: 72, h: 245, s: 1.0, shade: 0.92 },
-          { ox: p.dir * 16, oy: 10, w: 56, h: 215, s: 1.15, shade: 1.0 },
-          { ox: -p.dir * 8, oy: 16, w: 46, h: 190, s: 0.85, shade: 1.08 }
+          { ox: 0, oy: 0, w: 72, h: 245 * pScale, s: 1.0, shade: 0.92 },
+          { ox: p.dir * 16, oy: 10, w: 56, h: 215 * pScale, s: 1.15, shade: 1.0 },
+          { ox: -p.dir * 8, oy: 16, w: 46, h: 190 * pScale, s: 0.85, shade: 1.08 }
         ];
         locks.forEach((lk) => {
           const sx = p.x + lk.ox;
@@ -729,8 +829,10 @@ export class HairSalonEngine {
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(p.x + p.dir * 38, p.y + 24);
-        ctx.quadraticCurveTo(p.x + p.dir * 72 + sway * 0.5, p.y + 95, p.x + p.dir * 52 + sway, p.y + 160);
+        ctx.quadraticCurveTo(p.x + p.dir * 72 + sway * 0.5, p.y + 95 * pScale, p.x + p.dir * 52 + sway, p.y + 160 * pScale);
         ctx.stroke();
+
+        drawPresetGlitter(p.x + p.dir * 52, p.y + 100 * pScale, 32, 70 * pScale, p.glit, p.seed);
 
         // Cute hair tie ribbon
         ctx.fillStyle = '#ff5ca8';
@@ -745,10 +847,11 @@ export class HairSalonEngine {
       // High sweeping layered ponytail fountain
       const baseX = this.cx;
       const baseY = this.cy - 158;
+      const tScale = this.presetState.ponytailScale;
       const locks = [
-        { cx1: -115, cy1: -135, cx2: -225, cy2: 40, ex: -145, ey: 245, shade: 0.90 },
-        { cx1: -80, cy1: -110, cx2: -175, cy2: 70, ex: -105, ey: 220, shade: 1.0 },
-        { cx1: 80, cy1: -105, cx2: 145, cy2: -20, ex: 96, ey: 65, shade: 1.05 }
+        { cx1: -115, cy1: -135, cx2: -225, cy2: 40 * tScale, ex: -145, ey: 245 * tScale, shade: 0.90 },
+        { cx1: -80, cy1: -110, cx2: -175, cy2: 70 * tScale, ex: -105, ey: 220 * tScale, shade: 1.0 },
+        { cx1: 80, cy1: -105, cx2: 145, cy2: -20 * tScale, ex: 96, ey: 65 * tScale, shade: 1.05 }
       ];
       locks.forEach((lk, i) => {
         const sw = sway * (i === 2 ? -0.6 : 1.0);
@@ -771,6 +874,8 @@ export class HairSalonEngine {
         ctx.fill();
         ctx.stroke();
       });
+
+      drawPresetGlitter(baseX - 95, baseY + 45 * tScale, 55, 75 * tScale, this.presetState.topGlitter, 9);
 
       // Cute bright scrunchie on top of the head
       ctx.fillStyle = '#ffd43b';

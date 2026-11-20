@@ -24,6 +24,8 @@ const state = {
   glassesShape: 'round',
   glassesColor: '#e84c8a',
   undoStack: [],
+  pendingUndo: null,
+  strokeModified: false,
   draggingAcc: null,
   pointerDown: false,
   lastPt: null
@@ -445,6 +447,15 @@ const TOOL_ICONS = {
   dryer: '💨'
 };
 
+function commitPendingUndo() {
+  if (state.pendingUndo && !state.strokeModified) {
+    state.undoStack.push(state.pendingUndo);
+    if (state.undoStack.length > 25) state.undoStack.shift();
+    state.strokeModified = true;
+    syncUndoBtn();
+  }
+}
+
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   snd.init();
@@ -452,20 +463,22 @@ canvas.addEventListener('pointerdown', (e) => {
   const pt = getCanvasPoint(e);
   state.pointerDown = true;
   state.lastPt = pt;
+  state.pendingUndo = engine.getSnapshot();
+  state.strokeModified = false;
 
   // Allow dragging accessories whenever you grab one directly
   const hitAcc = engine.findAccessoryAt(pt.x, pt.y);
   if (hitAcc && (state.station === 'extras' || state.tool === 'none' || state.tool === 'drag')) {
-    pushUndo();
+    commitPendingUndo();
     state.draggingAcc = hitAcc;
     engine.activeAccUid = hitAcc.uid;
     return;
   }
 
   if (state.tool && state.tool !== 'none' && state.tool !== 'drag') {
-    pushUndo();
     engine.toolCursor = { x: pt.x, y: pt.y, icon: TOOL_ICONS[state.tool] || '', active: true };
     const touched = engine.applyTool(state.tool, pt.x, pt.y, 0, 0, { color: state.hairColor });
+    if (touched) commitPendingUndo();
     if (touched || state.tool === 'shower' || state.tool === 'dryer') {
       playToolSound(state.tool);
     }
@@ -489,6 +502,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (state.tool && state.tool !== 'none' && state.tool !== 'drag') {
     engine.toolCursor = { x: pt.x, y: pt.y, icon: TOOL_ICONS[state.tool] || '', active: true };
     const touched = engine.applyTool(state.tool, pt.x, pt.y, dx, dy, { color: state.hairColor });
+    if (touched) commitPendingUndo();
     if (touched || state.tool === 'shower' || state.tool === 'dryer') {
       playToolSound(state.tool);
     }
@@ -506,6 +520,8 @@ function endPointer() {
   }
   state.pointerDown = false;
   state.draggingAcc = null;
+  state.pendingUndo = null;
+  state.strokeModified = false;
   engine.activeAccUid = null;
   engine.toolCursor = null;
   state.lastPt = null;
@@ -611,6 +627,12 @@ $('#viewerDel').addEventListener('click', async () => {
 
 $('#viewerClose').addEventListener('click', () => $('#viewerModal').classList.remove('open'));
 $('#iosClose').addEventListener('click', () => $('#iosModal').classList.remove('open'));
+['#viewerModal', '#iosModal'].forEach((id) => {
+  const modal = $(id);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.remove('open');
+  });
+});
 
 /* ---------- Boot ---------- */
 syncMuteIcons();
