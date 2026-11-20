@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.1.0';
+﻿export const APP_VERSION = '0.1.1';
 
 export const CUSTOMERS = [
   {
@@ -152,16 +152,16 @@ export const STYLE_PRESETS = [
 ];
 
 export const ACCESSORIES = [
-  { id: 'bow-pink', emoji: '🎀', label: 'Bow', defaultY: 0.24, defaultX: 0.62, scale: 1.0 },
-  { id: 'crown', emoji: '👑', label: 'Crown', defaultY: 0.17, defaultX: 0.50, scale: 1.15 },
-  { id: 'star', emoji: '⭐', label: 'Star', defaultY: 0.28, defaultX: 0.36, scale: 0.9 },
-  { id: 'flower', emoji: '🌸', label: 'Flower', defaultY: 0.27, defaultX: 0.64, scale: 0.95 },
-  { id: 'butterfly', emoji: '🦋', label: 'Butterfly', defaultY: 0.25, defaultX: 0.35, scale: 0.95 },
-  { id: 'heart', emoji: '💖', label: 'Heart', defaultY: 0.30, defaultX: 0.63, scale: 0.9 },
-  { id: 'unicorn', emoji: '🦄', label: 'Unicorn', defaultY: 0.16, defaultX: 0.50, scale: 1.1 },
-  { id: 'party', emoji: '🥳', label: 'Hat', defaultY: 0.16, defaultX: 0.50, scale: 1.1 },
-  { id: 'rainbow', emoji: '🌈', label: 'Rainbow', defaultY: 0.19, defaultX: 0.50, scale: 1.15 },
-  { id: 'sparkle', emoji: '✨', label: 'Sparkle', defaultY: 0.24, defaultX: 0.38, scale: 0.95 }
+  { id: 'bow-pink', emoji: '🎀', label: 'Bow', defaultY: 0.33, defaultX: 0.59, scale: 0.95 },
+  { id: 'crown', emoji: '👑', label: 'Crown', defaultY: 0.27, defaultX: 0.50, scale: 1.15 },
+  { id: 'star', emoji: '⭐', label: 'Star', defaultY: 0.35, defaultX: 0.41, scale: 0.85 },
+  { id: 'flower', emoji: '🌸', label: 'Flower', defaultY: 0.37, defaultX: 0.60, scale: 0.90 },
+  { id: 'butterfly', emoji: '🦋', label: 'Butterfly', defaultY: 0.34, defaultX: 0.40, scale: 0.90 },
+  { id: 'heart', emoji: '💖', label: 'Heart', defaultY: 0.39, defaultX: 0.59, scale: 0.85 },
+  { id: 'unicorn', emoji: '🦄', label: 'Unicorn', defaultY: 0.27, defaultX: 0.50, scale: 1.05 },
+  { id: 'hat', emoji: '👒', label: 'Hat', defaultY: 0.27, defaultX: 0.50, scale: 1.20 },
+  { id: 'rainbow', emoji: '🌈', label: 'Rainbow', defaultY: 0.26, defaultX: 0.50, scale: 1.15 },
+  { id: 'sparkle', emoji: '✨', label: 'Sparkle', defaultY: 0.32, defaultX: 0.42, scale: 0.90 }
 ];
 
 export const BACKDROPS = [

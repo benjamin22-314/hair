@@ -40,6 +40,7 @@ export class HairSalonEngine {
     this.stylePreset = 'loose';
     this.glasses = null;
     this.accessories = [];
+    this.activeAccUid = null;
     this.particles = [];
     this.backdropId = 'salon';
 
@@ -1107,6 +1108,15 @@ export class HairSalonEngine {
     this.accessories.forEach((a) => {
       ctx.save();
       ctx.translate(a.x, a.y);
+      if (this.activeAccUid === a.uid) {
+        ctx.strokeStyle = 'rgba(232, 76, 138, 0.75)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 44 * a.scale, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.font = `${Math.round(74 * a.scale)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
       ctx.shadowColor = 'rgba(70, 30, 60, 0.22)';
       ctx.shadowBlur = 10;

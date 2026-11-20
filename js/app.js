@@ -437,6 +437,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (hitAcc && (state.station === 'extras' || state.tool === 'none' || state.tool === 'drag')) {
     pushUndo();
     state.draggingAcc = hitAcc;
+    engine.activeAccUid = hitAcc.uid;
     return;
   }
 
@@ -474,6 +475,7 @@ canvas.addEventListener('pointermove', (e) => {
 function endPointer() {
   state.pointerDown = false;
   state.draggingAcc = null;
+  engine.activeAccUid = null;
   state.lastPt = null;
 }
 
