@@ -1,4 +1,4 @@
-﻿const CACHE_VERSION = '0.1.1';
+﻿const CACHE_VERSION = '0.1.2';
 const CACHE_NAME = 'hair-salon-v' + CACHE_VERSION;
 
 const ASSETS = [
@@ -23,7 +23,14 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
+      .then((cache) => Promise.all(
+        ASSETS.map((url) =>
+          fetch(new Request(url, { cache: 'reload' }))
+            .then((res) => {
+              if (res && res.ok) return cache.put(url, res);
+            })
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });

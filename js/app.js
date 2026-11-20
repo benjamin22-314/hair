@@ -98,7 +98,7 @@ function buildCustomerCards() {
     card.className = 'customer-card';
 
     const preview = document.createElement('canvas');
-    const previewEngine = new HairSalonEngine(preview);
+    const previewEngine = new HairSalonEngine(preview, { preloadBackdrops: false });
     previewEngine.loadCustomer(cust);
     previewEngine.render(true);
 
@@ -128,6 +128,7 @@ function openCustomer(cust) {
   engine.loadCustomer(cust);
   $('#salonCustomerName').textContent = cust.isMonster ? `${cust.name} 👾` : cust.name;
   state.undoStack = [];
+  syncUndoBtn();
   state.glassesShape = cust.defaultGlasses ? cust.defaultGlasses.shape : 'none';
   state.glassesColor = cust.defaultGlasses ? cust.defaultGlasses.color : '#e84c8a';
   selectStation('cut');
@@ -135,9 +136,14 @@ function openCustomer(cust) {
 }
 
 /* ---------- Undo ---------- */
+function syncUndoBtn() {
+  $('#undoBtn').disabled = state.undoStack.length === 0;
+}
+
 function pushUndo() {
   state.undoStack.push(engine.getSnapshot());
   if (state.undoStack.length > 25) state.undoStack.shift();
+  syncUndoBtn();
 }
 
 $('#undoBtn').addEventListener('click', () => {
@@ -147,7 +153,8 @@ $('#undoBtn').addEventListener('click', () => {
   }
   snd.pop();
   engine.restoreSnapshot(state.undoStack.pop());
-  if (state.station === 'glasses') renderTray();
+  syncUndoBtn();
+  if (state.station === 'glasses' || state.station === 'style') renderTray();
 });
 
 $('#resetBtn').addEventListener('click', () => {
@@ -424,6 +431,20 @@ function playToolSound(tool) {
   else if (tool === 'dryer') snd.dryer();
 }
 
+const TOOL_ICONS = {
+  scissors: '✂️',
+  clippers: '🪒',
+  grow: '🧪',
+  dye: '🖌️',
+  glitter: '✨',
+  comb: '🪮',
+  curler: '🌀',
+  crimper: '〰️',
+  shampoo: '🫧',
+  shower: '🚿',
+  dryer: '💨'
+};
+
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   snd.init();
@@ -443,6 +464,7 @@ canvas.addEventListener('pointerdown', (e) => {
 
   if (state.tool && state.tool !== 'none' && state.tool !== 'drag') {
     pushUndo();
+    engine.toolCursor = { x: pt.x, y: pt.y, icon: TOOL_ICONS[state.tool] || '', active: true };
     const touched = engine.applyTool(state.tool, pt.x, pt.y, 0, 0, { color: state.hairColor });
     if (touched || state.tool === 'shower' || state.tool === 'dryer') {
       playToolSound(state.tool);
@@ -465,6 +487,7 @@ canvas.addEventListener('pointermove', (e) => {
   }
 
   if (state.tool && state.tool !== 'none' && state.tool !== 'drag') {
+    engine.toolCursor = { x: pt.x, y: pt.y, icon: TOOL_ICONS[state.tool] || '', active: true };
     const touched = engine.applyTool(state.tool, pt.x, pt.y, dx, dy, { color: state.hairColor });
     if (touched || state.tool === 'shower' || state.tool === 'dryer') {
       playToolSound(state.tool);
@@ -473,9 +496,18 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 function endPointer() {
+  if (state.draggingAcc) {
+    const a = state.draggingAcc;
+    if (Math.hypot(a.x - engine.cx, a.y - 728) < 76) {
+      engine.accessories = engine.accessories.filter((item) => item.uid !== a.uid);
+      snd.pop();
+      toast('Removed! 🗑️');
+    }
+  }
   state.pointerDown = false;
   state.draggingAcc = null;
   engine.activeAccUid = null;
+  engine.toolCursor = null;
   state.lastPt = null;
 }
 

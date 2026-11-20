@@ -156,6 +156,11 @@ body {
   transform: translateY(2px);
 }
 
+.icon-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 /* ---------- Home Screen ---------- */
 .home-header {
   display: flex;

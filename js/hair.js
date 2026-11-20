@@ -22,7 +22,7 @@ function lightenHex(hex, amount) {
 }
 
 export class HairSalonEngine {
-  constructor(canvas) {
+  constructor(canvas, { preloadBackdrops = true } = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.W = 1000;
@@ -45,7 +45,7 @@ export class HairSalonEngine {
     this.backdropId = 'salon';
 
     this.backdropImages = {};
-    this.preloadBackdrops();
+    if (preloadBackdrops) this.preloadBackdrops();
 
     // Animation state
     this.time = 0;
@@ -261,28 +261,52 @@ export class HairSalonEngine {
     return null;
   }
 
+  // Compute effective visual length for a strand based on active hairstyle preset
+  getVisualStrandLength(s) {
+    let len = s.maxLen * Math.max(0.08, s.length);
+    if (this.stylePreset === 'buns') {
+      if (s.layer === 'back') len = Math.min(len, 72);
+    } else if (this.stylePreset === 'pigtails') {
+      if (s.layer === 'back') len = Math.min(len, 86);
+    } else if (this.stylePreset === 'ponytail') {
+      if (s.layer === 'back') len = Math.min(len, 68);
+    } else if (this.stylePreset === 'mohawk') {
+      const inCrest = s.t >= 0.30 && s.t <= 0.70;
+      if (!inCrest) len = Math.min(len, 38);
+      else len = Math.min(len, 185);
+    }
+    return len;
+  }
+
   // Compute approximate tip position for hit-testing tools
   getStrandPoints(s) {
-    const len = s.maxLen * Math.max(0.08, s.length);
-    const spiky = this.stylePreset === 'mohawk' && s.t > 0.3 && s.t < 0.7;
-    const dirY = spiky ? -0.9 : 1;
-    const midX = s.ax + s.outward * len * 0.34 + s.sway * 0.45;
+    const len = this.getVisualStrandLength(s);
+    const spiky = this.stylePreset === 'mohawk' && s.t >= 0.30 && s.t <= 0.70;
+    const dirY = spiky ? -0.92 : 1;
+    const spread = spiky ? (s.t - 0.5) * 2.1 : s.outward;
+    const midX = s.ax + spread * len * 0.36 + s.sway * 0.45;
     const midY = s.ay + dirY * len * 0.52;
-    const tipX = s.ax + s.outward * len * 0.52 + s.sway;
+    const tipX = s.ax + spread * len * 0.58 + s.sway;
     const tipY = s.ay + dirY * len;
     return { midX, midY, tipX, tipY, len };
   }
 
   applyTool(tool, x, y, dx, dy, options = {}) {
     let touched = false;
-    const radius = tool === 'dryer' ? 125 : (tool === 'clippers' ? 72 : 68);
+    const radius = tool === 'dryer' ? 125 : (tool === 'clippers' ? 74 : 70);
 
     this.strands.forEach((s, idx) => {
       const pt = this.getStrandPoints(s);
-      const dMid = Math.hypot(pt.midX - x, pt.midY - y);
-      const dTip = Math.hypot(pt.tipX - x, pt.tipY - y);
+      // Sample 5 points along the strand so long hair never has dead zones
+      let d = Infinity;
+      for (let k = 0; k <= 4; k++) {
+        const f = k / 4;
+        const px = (1 - f) * (1 - f) * s.ax + 2 * (1 - f) * f * pt.midX + f * f * pt.tipX;
+        const py = (1 - f) * (1 - f) * s.ay + 2 * (1 - f) * f * pt.midY + f * f * pt.tipY;
+        const dist = Math.hypot(px - x, py - y);
+        if (dist < d) d = dist;
+      }
       const dRoot = Math.hypot(s.ax - x, s.ay - y);
-      const d = Math.min(dMid, dTip, dRoot);
 
       if (d < radius) {
         touched = true;
@@ -533,9 +557,15 @@ export class HairSalonEngine {
     // Accessories
     this.drawAccessories(ctx);
 
-    // Particles
+    // Particles, trash bin, & active tool cursor
     if (!forPhoto) {
       this.drawParticles(ctx);
+      if (this.activeAccUid) {
+        this.drawTrashZone(ctx);
+      }
+      if (this.toolCursor && this.toolCursor.active && this.toolCursor.icon) {
+        this.drawToolCursor(ctx);
+      }
     }
   }
 
@@ -614,76 +644,157 @@ export class HairSalonEngine {
     const leftCol = this.getDominantHairColor('left');
     const rightCol = this.getDominantHairColor('right');
     const topCol = this.getDominantHairColor('all');
+    const sway = Math.sin(this.time * 2.0) * 6;
 
     if (this.stylePreset === 'buns') {
       [
-        { x: this.cx - 145, y: this.cy - 155, col: leftCol },
-        { x: this.cx + 145, y: this.cy - 155, col: rightCol }
+        { x: this.cx - 124, y: this.cy - 134, dir: -1, col: leftCol },
+        { x: this.cx + 124, y: this.cy - 134, dir: 1, col: rightCol }
       ].forEach((b) => {
+        // Main fluffy bun
         ctx.fillStyle = b.col;
-        ctx.strokeStyle = shadeHex(b.col, 0.68);
+        ctx.strokeStyle = shadeHex(b.col, 0.65);
         ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, 74, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, 64, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        // Highlight arc
-        ctx.strokeStyle = lightenHex(b.col, 0.35);
-        ctx.lineWidth = 10;
+
+        // Soft spiral hair swirl lines inside bun
+        ctx.strokeStyle = shadeHex(b.col, 0.78);
+        ctx.lineWidth = 5;
         ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.arc(b.x - 8, b.y - 8, 46, Math.PI * 1.1, Math.PI * 1.6);
+        ctx.arc(b.x, b.y, 38, Math.PI * 0.2, Math.PI * 1.35);
         ctx.stroke();
+
+        // Glossy crescent highlight
+        ctx.strokeStyle = lightenHex(b.col, 0.38);
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.arc(b.x - 6, b.y - 6, 44, Math.PI * 1.15, Math.PI * 1.62);
+        ctx.stroke();
+
+        // Cute scrunchie band where bun meets head
+        ctx.save();
+        ctx.translate(b.x - b.dir * 34, b.y + 42);
+        ctx.rotate(b.dir * 0.65);
+        ctx.fillStyle = '#ff6ba9';
+        ctx.strokeStyle = '#c4366e';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(-34, -12, 68, 24, 12);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
       });
     } else if (this.stylePreset === 'pigtails') {
       [
-        { x: this.cx - 165, y: this.cy - 30, dir: -1, col: leftCol },
-        { x: this.cx + 165, y: this.cy - 30, dir: 1, col: rightCol }
+        { x: this.cx - 146, y: this.cy - 34, dir: -1, col: leftCol },
+        { x: this.cx + 146, y: this.cy - 34, dir: 1, col: rightCol }
       ].forEach((p) => {
-        ctx.fillStyle = p.col;
-        ctx.strokeStyle = shadeHex(p.col, 0.68);
-        ctx.lineWidth = 6;
+        // Draw 3 layered bouncy locks per pigtail
+        const locks = [
+          { ox: 0, oy: 0, w: 72, h: 245, s: 1.0, shade: 0.92 },
+          { ox: p.dir * 16, oy: 10, w: 56, h: 215, s: 1.15, shade: 1.0 },
+          { ox: -p.dir * 8, oy: 16, w: 46, h: 190, s: 0.85, shade: 1.08 }
+        ];
+        locks.forEach((lk) => {
+          const sx = p.x + lk.ox;
+          const sy = p.y + lk.oy;
+          const sw = sway * lk.s;
+          ctx.fillStyle = lk.shade < 1 ? shadeHex(p.col, lk.shade) : (lk.shade > 1 ? lightenHex(p.col, 0.14) : p.col);
+          ctx.strokeStyle = shadeHex(p.col, 0.65);
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.bezierCurveTo(
+            sx + p.dir * (lk.w * 1.45), sy - 10,
+            sx + p.dir * (lk.w * 1.6) + sw, sy + lk.h * 0.65,
+            sx + p.dir * (lk.w * 0.55) + sw * 1.4, sy + lk.h
+          );
+          ctx.bezierCurveTo(
+            sx + p.dir * (lk.w * 0.1) + sw, sy + lk.h * 0.72,
+            sx + p.dir * 4, sy + lk.h * 0.25,
+            sx, sy
+          );
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        });
+
+        // Glossy sheen
+        ctx.strokeStyle = lightenHex(p.col, 0.36);
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.bezierCurveTo(p.x + p.dir * 130, p.y - 20, p.x + p.dir * 145, p.y + 180, p.x + p.dir * 48, p.y + 250);
-        ctx.bezierCurveTo(p.x + p.dir * 10, p.y + 200, p.x - p.dir * 10, p.y + 90, p.x, p.y);
+        ctx.moveTo(p.x + p.dir * 38, p.y + 24);
+        ctx.quadraticCurveTo(p.x + p.dir * 72 + sway * 0.5, p.y + 95, p.x + p.dir * 52 + sway, p.y + 160);
+        ctx.stroke();
+
+        // Cute hair tie ribbon
+        ctx.fillStyle = '#ff5ca8';
+        ctx.strokeStyle = '#c4366e';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(p.x + p.dir * 10, p.y + 2, 16, 28, p.dir * 0.22, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        // Hair tie
-        ctx.fillStyle = '#ff5ca8';
-        ctx.beginPath();
-        ctx.ellipse(p.x + p.dir * 14, p.y + 4, 16, 26, p.dir * 0.3, 0, Math.PI * 2);
-        ctx.fill();
       });
     } else if (this.stylePreset === 'ponytail') {
-      ctx.fillStyle = topCol;
-      ctx.strokeStyle = shadeHex(topCol, 0.68);
-      ctx.lineWidth = 6;
+      // High sweeping layered ponytail fountain
+      const baseX = this.cx;
+      const baseY = this.cy - 158;
+      const locks = [
+        { cx1: -115, cy1: -135, cx2: -225, cy2: 40, ex: -145, ey: 245, shade: 0.90 },
+        { cx1: -80, cy1: -110, cx2: -175, cy2: 70, ex: -105, ey: 220, shade: 1.0 },
+        { cx1: 80, cy1: -105, cx2: 145, cy2: -20, ex: 96, ey: 65, shade: 1.05 }
+      ];
+      locks.forEach((lk, i) => {
+        const sw = sway * (i === 2 ? -0.6 : 1.0);
+        ctx.fillStyle = lk.shade < 1 ? shadeHex(topCol, lk.shade) : (lk.shade > 1 ? lightenHex(topCol, 0.12) : topCol);
+        ctx.strokeStyle = shadeHex(topCol, 0.65);
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(baseX, baseY);
+        ctx.bezierCurveTo(
+          baseX + lk.cx1, baseY + lk.cy1,
+          baseX + lk.cx2 + sw, baseY + lk.cy2,
+          baseX + lk.ex + sw * 1.4, baseY + lk.ey
+        );
+        ctx.bezierCurveTo(
+          baseX + lk.ex * 0.55 + sw, baseY + lk.ey * 0.62,
+          baseX + lk.cx1 * 0.2, baseY - 25,
+          baseX, baseY
+        );
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // Cute bright scrunchie on top of the head
+      ctx.fillStyle = '#ffd43b';
+      ctx.strokeStyle = '#d99b00';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(this.cx, this.cy - 175);
-      ctx.bezierCurveTo(this.cx - 135, this.cy - 265, this.cx - 205, this.cy - 40, this.cx - 120, this.cy + 130);
-      ctx.bezierCurveTo(this.cx - 60, this.cy + 20, this.cx + 45, this.cy - 115, this.cx, this.cy - 175);
+      ctx.roundRect(baseX - 36, baseY - 16, 72, 26, 13);
       ctx.fill();
       ctx.stroke();
-      // Scrunchie
-      ctx.fillStyle = '#ffd43b';
-      ctx.beginPath();
-      ctx.ellipse(this.cx, this.cy - 172, 34, 16, 0, 0, Math.PI * 2);
-      ctx.fill();
     }
     ctx.restore();
   }
 
   drawStrand(ctx, s) {
-    const len = s.maxLen * Math.max(0.08, s.length);
-    const spiky = this.stylePreset === 'mohawk' && s.t > 0.26 && s.t < 0.74;
+    const len = this.getVisualStrandLength(s);
+    const spiky = this.stylePreset === 'mohawk' && s.t >= 0.30 && s.t <= 0.70;
     const dirY = spiky ? -0.92 : 1;
+    const spread = spiky ? (s.t - 0.5) * 2.1 : s.outward;
 
     const steps = 10;
     const pts = [];
     for (let i = 0; i <= steps; i++) {
       const f = i / steps;
-      const baseX = s.ax + s.outward * len * (0.28 * f + 0.25 * f * f) + s.sway * f * f;
+      const baseX = s.ax + spread * len * (0.28 * f + 0.25 * f * f) + s.sway * f * f;
       const baseY = s.ay + dirY * len * f;
       let wave = 0;
       if (s.curl > 0.04) {
@@ -1170,6 +1281,40 @@ export class HairSalonEngine {
         ctx.fill();
       }
     });
+    ctx.restore();
+  }
+
+  drawTrashZone(ctx) {
+    const active = this.accessories.find((a) => a.uid === this.activeAccUid);
+    const tx = this.cx;
+    const ty = 728;
+    const over = active && Math.hypot(active.x - tx, active.y - ty) < 76;
+    ctx.save();
+    ctx.fillStyle = over ? 'rgba(229, 72, 77, 0.92)' : 'rgba(60, 38, 66, 0.72)';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(tx, ty, over ? 52 : 42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = `${over ? 46 : 38}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🗑️', tx, ty + 2);
+    ctx.restore();
+  }
+
+  drawToolCursor(ctx) {
+    const c = this.toolCursor;
+    ctx.save();
+    ctx.translate(c.x - 26, c.y - 26);
+    ctx.font = '56px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(45, 22, 54, 0.25)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    ctx.fillText(c.icon, 0, 0);
     ctx.restore();
   }
 

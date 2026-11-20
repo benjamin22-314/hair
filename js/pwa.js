@@ -82,6 +82,18 @@ export function initPWA({ installBtn, updateBtn, iosModal, toast }) {
     try {
       if (swReg) {
         await swReg.update();
+        const installing = swReg.installing;
+        if (installing) {
+          await new Promise((resolve) => {
+            const done = () => resolve();
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed' || installing.state === 'activated' || installing.state === 'redundant') {
+                done();
+              }
+            });
+            setTimeout(done, 4000);
+          });
+        }
         if (swReg.waiting) {
           swReg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
@@ -91,7 +103,7 @@ export function initPWA({ installBtn, updateBtn, iosModal, toast }) {
         await Promise.all(keys.map((k) => caches.delete(k)));
       }
     } catch {
-      // Fall through to hard reload
+      // Fall through to reload
     }
     window.location.reload();
   }
