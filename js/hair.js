@@ -104,20 +104,20 @@ export class HairSalonEngine {
     }
     const list = [];
     const offsets = [
-      { dy: 42, ang: -0.20 },
+      { dy: 48, ang: -0.18 },
       { dy: 58, ang: 0.02 },
-      { dy: 74, ang: 0.24 }
+      { dy: 68, ang: 0.22 }
     ];
     [-1, 1].forEach((side) => {
       offsets.forEach((o, i) => {
         list.push({
           side,
           index: i + (side > 0 ? 3 : 0),
-          ax: this.cx + side * 66,
+          ax: this.cx + side * 46,
           ay: this.cy + o.dy,
           angle: o.ang,
-          maxLen: 165,
-          length: 0.72,
+          maxLen: 175,
+          length: 0.74,
           color: '#fffaf2',
           curl: 0,
           crimp: 0,
@@ -781,6 +781,11 @@ export class HairSalonEngine {
       if (s.layer === 'front') this.drawStrand(ctx, s);
     });
 
+    // Draw Pip's pointy cat ears cleanly on top of front hair so they're always unmistakable
+    if (this.customer.isCat) {
+      this.drawCatEars(ctx);
+    }
+
     // Shampoo foam blobs on hair
     this.drawFoam(ctx);
 
@@ -1141,15 +1146,16 @@ export class HairSalonEngine {
       const pts = [];
       for (let i = 0; i <= steps; i++) {
         const f = i / steps;
+        // Graceful slight natural arch
+        const arch = -Math.sin(f * Math.PI) * 8;
         let px = w.ax + dirX * len * f;
-        let py = w.ay + dirY * len * f + w.sway * f * f;
+        let py = w.ay + dirY * len * f + arch + w.sway * f * f;
 
-        // Curling wand makes fancy curly/twirly whiskers!
+        // Curling wand adds gentle wave along shaft
         if (w.curl > 0.04) {
-          const spiral = Math.sin(f * Math.PI * (2.5 + w.curl * 2.5)) * (16 * w.curl * f);
-          const tipCurl = f > 0.65 ? (f - 0.65) * 46 * w.curl : 0;
-          px += perpX * spiral;
-          py += perpY * spiral - tipCurl;
+          const wave = Math.sin(f * Math.PI * (2 + w.curl * 2)) * (11 * w.curl * f);
+          px += perpX * wave;
+          py += perpY * wave;
         }
         // Crimper makes silly zig-zag whiskers!
         if (w.crimp > 0.04) {
@@ -1160,36 +1166,54 @@ export class HairSalonEngine {
         pts.push({ x: px, y: py });
       }
 
-      const trace = () => {
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length - 1; i++) {
-          const xc = (pts[i].x + pts[i + 1].x) / 2;
-          const yc = (pts[i].y + pts[i + 1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+      // When curled, add a real playful spiral curly-Q loop at the tip!
+      if (w.curl > 0.12) {
+        const end = pts[pts.length - 1];
+        const loopR = 14 + w.curl * 16;
+        const loopCx = end.x;
+        const loopCy = end.y - loopR;
+        const spiralSteps = 7;
+        const maxTheta = Math.PI * (1.2 + w.curl * 1.45);
+        for (let k = 1; k <= spiralSteps; k++) {
+          const tf = k / spiralSteps;
+          const theta = Math.PI * 0.5 - w.side * maxTheta * tf;
+          const r = loopR * (1 - tf * 0.52);
+          pts.push({
+            x: loopCx + Math.cos(theta) * r,
+            y: loopCy + Math.sin(theta) * r
+          });
         }
-        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-      };
+      }
 
       const baseCol = w.wet > 0.2 ? shadeHex(w.color, 1 - w.wet * 0.18) : w.color;
       const outlineCol = w.color === '#fffaf2' ? '#9e6b43' : shadeHex(w.color, 0.58);
 
-      // Whisker outline
-      trace();
-      ctx.strokeStyle = outlineCol;
-      ctx.lineWidth = 11;
-      ctx.stroke();
+      // Draw tapered outline & fill segments (thicker at root, finer toward tip)
+      for (let i = 0; i < pts.length - 1; i++) {
+        const f = i / (pts.length - 1);
+        const outW = 10.5 - f * 4.5;
+        ctx.strokeStyle = outlineCol;
+        ctx.lineWidth = outW;
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+        ctx.stroke();
+      }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const f = i / (pts.length - 1);
+        const fillW = 6.2 - f * 3.0;
+        ctx.strokeStyle = baseCol;
+        ctx.lineWidth = fillW;
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+        ctx.stroke();
+      }
 
-      // Whisker main stroke
-      trace();
-      ctx.strokeStyle = baseCol;
-      ctx.lineWidth = 6.5;
-      ctx.stroke();
-
-      // Cute whisker root dot
+      // Cute whisker root dot inside the cream muzzle pad
       ctx.fillStyle = '#c96f2d';
       ctx.beginPath();
-      ctx.arc(w.ax, w.ay, 4, 0, Math.PI * 2);
+      ctx.arc(w.ax, w.ay, 3.6, 0, Math.PI * 2);
       ctx.fill();
 
       // Glitter sparkles on whisker
@@ -1208,7 +1232,7 @@ export class HairSalonEngine {
 
       // Cute mini shampoo bubbles on whisker
       if (w.foam > 0.15) {
-        const mid = pts[Math.floor(pts.length * 0.55)];
+        const mid = pts[Math.floor(pts.length * 0.45)];
         const br = 8 + w.foam * 11;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         ctx.strokeStyle = 'rgba(170, 220, 255, 0.78)';
@@ -1220,6 +1244,40 @@ export class HairSalonEngine {
       }
     });
 
+    ctx.restore();
+  }
+
+  drawCatEars(ctx) {
+    const c = this.customer;
+    const cx = this.cx;
+    const cy = this.cy;
+    ctx.save();
+    [-1, 1].forEach((dir) => {
+      ctx.save();
+      ctx.translate(cx + dir * 106, cy - 114);
+      ctx.rotate(dir * 0.28);
+      // Outer furry ear
+      ctx.fillStyle = c.skin;
+      ctx.strokeStyle = shadeHex(c.skinShade, 0.85);
+      ctx.lineWidth = 6;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-42, 30);
+      ctx.quadraticCurveTo(-18, -42, 0, -68);
+      ctx.quadraticCurveTo(18, -42, 42, 30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Pink inner ear
+      ctx.fillStyle = '#ff9eb8';
+      ctx.beginPath();
+      ctx.moveTo(-22, 18);
+      ctx.quadraticCurveTo(-8, -22, 0, -40);
+      ctx.quadraticCurveTo(8, -22, 22, 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
     ctx.restore();
   }
 
@@ -1255,9 +1313,10 @@ export class HairSalonEngine {
 
     ctx.save();
 
-    // Shoulders & shirt
-    ctx.fillStyle = c.shirt;
-    ctx.strokeStyle = shadeHex(c.shirt, 0.72);
+    // Shoulders & shirt (or furry cat body + fluffy cream chest patch for Pip!)
+    const bodyCol = c.isCat ? c.skin : c.shirt;
+    ctx.fillStyle = bodyCol;
+    ctx.strokeStyle = shadeHex(bodyCol, 0.72);
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(cx - 175, this.H + 20);
@@ -1268,26 +1327,11 @@ export class HairSalonEngine {
     ctx.fill();
     ctx.stroke();
 
-    // Shirt collar / stripe accent (or cat collar with golden bell!)
     if (c.isCat) {
-      ctx.fillStyle = '#ff5ca8';
-      ctx.strokeStyle = '#c4366e';
-      ctx.lineWidth = 5;
+      // Fluffy cream chest fur patch
+      ctx.fillStyle = c.muzzleColor || '#fff2df';
       ctx.beginPath();
-      ctx.roundRect(cx - 56, cy + 174, 112, 26, 13);
-      ctx.fill();
-      ctx.stroke();
-      // Shiny golden bell
-      ctx.fillStyle = '#ffd43b';
-      ctx.strokeStyle = '#c98a00';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(cx, cy + 206, 18, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#8c5a00';
-      ctx.beginPath();
-      ctx.arc(cx, cy + 210, 4.5, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy + 258, 76, 68, 0, 0, Math.PI * 2);
       ctx.fill();
     } else {
       ctx.fillStyle = c.shirtAccent;
@@ -1296,11 +1340,34 @@ export class HairSalonEngine {
       ctx.fill();
     }
 
-    // Neck
+    // Neck (drawn BEFORE cat collar so collar wraps cleanly in front!)
     ctx.fillStyle = c.skinShade;
     ctx.beginPath();
     ctx.roundRect(cx - 34, cy + 135, 68, 72, 26);
     ctx.fill();
+
+    // Cat pink collar & shiny golden bell in front of neck
+    if (c.isCat) {
+      ctx.fillStyle = '#ff5ca8';
+      ctx.strokeStyle = '#c4366e';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.roundRect(cx - 56, cy + 172, 112, 24, 12);
+      ctx.fill();
+      ctx.stroke();
+      // Shiny golden bell
+      ctx.fillStyle = '#ffd43b';
+      ctx.strokeStyle = '#c98a00';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 204, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#8c5a00';
+      ctx.beginPath();
+      ctx.arc(cx, cy + 208, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Monster cute striped horns!
     if (c.isMonster) {
@@ -1308,35 +1375,8 @@ export class HairSalonEngine {
       this.drawMonsterHorn(ctx, cx + 92, cy - 122, 0.32, c.hornColor, c.hornStripe);
     }
 
-    // Ears (pointy cat ears for Pip, rounded ears for others)
-    if (c.isCat) {
-      [-1, 1].forEach((dir) => {
-        ctx.save();
-        ctx.translate(cx + dir * 102, cy - 116);
-        ctx.rotate(dir * 0.28);
-        // Outer furry ear
-        ctx.fillStyle = c.skin;
-        ctx.strokeStyle = shadeHex(c.skinShade, 0.85);
-        ctx.lineWidth = 6;
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-42, 34);
-        ctx.quadraticCurveTo(-18, -42, 0, -68);
-        ctx.quadraticCurveTo(18, -42, 42, 34);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        // Pink inner ear
-        ctx.fillStyle = '#ff9eb8';
-        ctx.beginPath();
-        ctx.moveTo(-22, 22);
-        ctx.quadraticCurveTo(-8, -22, 0, -40);
-        ctx.quadraticCurveTo(8, -22, 22, 22);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      });
-    } else {
+    // Ears (rounded ears for non-cats; Pip's cat ears are drawn on top of front hair)
+    if (!c.isCat) {
       [-1, 1].forEach((dir) => {
         ctx.fillStyle = c.skin;
         ctx.strokeStyle = c.skinShade;
@@ -1352,8 +1392,29 @@ export class HairSalonEngine {
       });
     }
 
-    // Head shape with soft shading gradient
-    const headGrad = ctx.createRadialGradient(cx - 35, cy - 45, 20, cx, cy, this.headRy * 1.15);
+    // Fluffy side cheek tufts for Pip the Cat
+    if (c.isCat) {
+      [-1, 1].forEach((dir) => {
+        ctx.fillStyle = c.skin;
+        ctx.strokeStyle = shadeHex(c.skinShade, 0.85);
+        ctx.lineWidth = 6;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx + dir * 136, cy + 18);
+        ctx.lineTo(cx + dir * 172, cy + 36);
+        ctx.lineTo(cx + dir * 150, cy + 52);
+        ctx.lineTo(cx + dir * 168, cy + 68);
+        ctx.lineTo(cx + dir * 134, cy + 78);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
+
+    // Head shape with soft shading gradient (wider kitten shape for Pip!)
+    const hRx = c.isCat ? this.headRx * 1.06 : this.headRx;
+    const hRy = c.isCat ? this.headRy * 0.94 : this.headRy;
+    const headGrad = ctx.createRadialGradient(cx - 35, cy - 45, 20, cx, cy, hRy * 1.15);
     headGrad.addColorStop(0, lightenHex(c.skin, 0.12));
     headGrad.addColorStop(0.75, c.skin);
     headGrad.addColorStop(1, c.skinShade);
@@ -1362,7 +1423,7 @@ export class HairSalonEngine {
     ctx.strokeStyle = shadeHex(c.skinShade, 0.85);
     ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, this.headRx, this.headRy, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, hRx, hRy, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
@@ -1427,17 +1488,19 @@ export class HairSalonEngine {
       });
     }
 
-    // Eyebrows
-    ctx.strokeStyle = c.isMonster ? '#3a225d' : shadeHex(c.defaultHair, 0.85);
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    const browLift = this.expression === 'surprised' ? -10 : 0;
-    [-1, 1].forEach((dir) => {
-      ctx.beginPath();
-      ctx.moveTo(cx + dir * 32, cy - 36 + browLift);
-      ctx.quadraticCurveTo(cx + dir * 56, cy - 48 + browLift, cx + dir * 78, cy - 34 + browLift);
-      ctx.stroke();
-    });
+    // Eyebrows (skip human eyebrows on Pip the Cat)
+    if (!c.isCat) {
+      ctx.strokeStyle = c.isMonster ? '#3a225d' : shadeHex(c.defaultHair, 0.85);
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      const browLift = this.expression === 'surprised' ? -10 : 0;
+      [-1, 1].forEach((dir) => {
+        ctx.beginPath();
+        ctx.moveTo(cx + dir * 32, cy - 36 + browLift);
+        ctx.quadraticCurveTo(cx + dir * 56, cy - 48 + browLift, cx + dir * 78, cy - 34 + browLift);
+        ctx.stroke();
+      });
+    }
 
     // Eyes
     const eyeY = cy + 6;
@@ -1453,7 +1516,7 @@ export class HairSalonEngine {
         ctx.arc(ex, eyeY + 6, 18, Math.PI * 1.12, Math.PI * 1.88);
         ctx.stroke();
       } else {
-        const er = c.isMonster ? 24 : 21;
+        const er = (c.isMonster || c.isCat) ? 24 : 21;
         // White sclera
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -1462,12 +1525,16 @@ export class HairSalonEngine {
         // Iris
         ctx.fillStyle = c.eyeColor;
         ctx.beginPath();
-        ctx.arc(ex, eyeY + 1, er * 0.66, 0, Math.PI * 2);
+        ctx.arc(ex, eyeY + 1, er * 0.70, 0, Math.PI * 2);
         ctx.fill();
-        // Pupil
+        // Pupil (cute vertical cat-oval pupil for Pip!)
         ctx.fillStyle = '#1d131c';
         ctx.beginPath();
-        ctx.arc(ex, eyeY + 1, er * 0.36, 0, Math.PI * 2);
+        if (c.isCat) {
+          ctx.ellipse(ex, eyeY + 1, er * 0.24, er * 0.50, 0, 0, Math.PI * 2);
+        } else {
+          ctx.arc(ex, eyeY + 1, er * 0.36, 0, Math.PI * 2);
+        }
         ctx.fill();
         // Big sparkle highlight
         ctx.fillStyle = '#ffffff';
