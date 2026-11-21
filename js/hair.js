@@ -37,6 +37,7 @@ export class HairSalonEngine {
 
     this.customer = null;
     this.strands = [];
+    this.whiskers = [];
     this.stylePreset = 'loose';
     this.presetState = this.defaultPresetState();
     this.glasses = null;
@@ -93,6 +94,42 @@ export class HairSalonEngine {
     this.expression = 'happy';
     this.expressionTimer = 0;
     this.buildStrands(customer);
+    this.buildWhiskers(customer);
+  }
+
+  buildWhiskers(customer) {
+    if (!customer || !customer.isCat) {
+      this.whiskers = [];
+      return;
+    }
+    const list = [];
+    const offsets = [
+      { dy: 42, ang: -0.20 },
+      { dy: 58, ang: 0.02 },
+      { dy: 74, ang: 0.24 }
+    ];
+    [-1, 1].forEach((side) => {
+      offsets.forEach((o, i) => {
+        list.push({
+          side,
+          index: i + (side > 0 ? 3 : 0),
+          ax: this.cx + side * 66,
+          ay: this.cy + o.dy,
+          angle: o.ang,
+          maxLen: 165,
+          length: 0.72,
+          color: '#fffaf2',
+          curl: 0,
+          crimp: 0,
+          glitter: 0,
+          foam: 0,
+          wet: 0,
+          sway: 0,
+          swayVel: 0
+        });
+      });
+    });
+    this.whiskers = list;
   }
 
   buildStrands(customer) {
@@ -178,6 +215,15 @@ export class HairSalonEngine {
         wet: s.wet,
         foam: s.foam,
         glitter: s.glitter
+      })),
+      whiskers: this.whiskers.map((w) => ({
+        length: w.length,
+        color: w.color,
+        curl: w.curl,
+        crimp: w.crimp,
+        wet: w.wet,
+        foam: w.foam,
+        glitter: w.glitter
       }))
     };
   }
@@ -191,6 +237,11 @@ export class HairSalonEngine {
     snap.strands.forEach((st, i) => {
       if (this.strands[i]) Object.assign(this.strands[i], st);
     });
+    if (snap.whiskers) {
+      snap.whiskers.forEach((wt, i) => {
+        if (this.whiskers[i]) Object.assign(this.whiskers[i], wt);
+      });
+    }
   }
 
   setExpression(expr, duration = 1.0) {
@@ -226,6 +277,9 @@ export class HairSalonEngine {
     this.strands.forEach((s, i) => {
       s.color = hex === 'rainbow' ? RAINBOW_HEX[i % RAINBOW_HEX.length] : hex;
     });
+    this.whiskers.forEach((w, i) => {
+      w.color = hex === 'rainbow' ? RAINBOW_HEX[i % RAINBOW_HEX.length] : hex;
+    });
     if (hex === 'rainbow') {
       this.presetState.leftColor = RAINBOW_HEX[0];
       this.presetState.rightColor = RAINBOW_HEX[4];
@@ -249,6 +303,10 @@ export class HairSalonEngine {
     this.strands.forEach((s) => {
       s.length = Math.min(1.0, s.length + 0.35);
       s.swayVel += (Math.random() - 0.5) * 16;
+    });
+    this.whiskers.forEach((w) => {
+      w.length = Math.min(1.3, w.length + 0.30);
+      w.swayVel += (Math.random() - 0.5) * 18;
     });
     this.presetState.pigtailScale = Math.min(1.15, this.presetState.pigtailScale + 0.25);
     this.presetState.ponytailScale = Math.min(1.15, this.presetState.ponytailScale + 0.25);
@@ -467,6 +525,91 @@ export class HairSalonEngine {
       }
     });
 
+    // Interactive cat whiskers!
+    if (this.whiskers.length) {
+      const wRadius = tool === 'dryer' ? 120 : 62;
+      this.whiskers.forEach((w, idx) => {
+        const wLen = w.maxLen * Math.max(0.18, w.length);
+        const dirX = Math.cos(w.angle) * w.side;
+        const dirY = Math.sin(w.angle);
+        const tipX = w.ax + dirX * wLen;
+        const tipY = w.ay + dirY * wLen + w.sway;
+
+        let d = Infinity;
+        for (let k = 0; k <= 4; k++) {
+          const f = k / 4;
+          const px = w.ax + (tipX - w.ax) * f;
+          const py = w.ay + (tipY - w.ay) * f;
+          const dist = Math.hypot(px - x, py - y);
+          if (dist < d) d = dist;
+        }
+
+        if (d < wRadius) {
+          touched = true;
+          const strength = 1 - d / wRadius;
+          if (tool === 'scissors') {
+            const prev = w.length;
+            w.length = Math.max(0.18, w.length - 0.08 * strength);
+            w.swayVel += dy * 0.3;
+            if (prev - w.length > 0.015) {
+              this.spawnClipping(tipX, tipY, w.color);
+              this.setExpression('surprised', 0.65);
+            }
+          } else if (tool === 'clippers') {
+            const prev = w.length;
+            w.length = Math.max(0.18, w.length - 0.14 * strength);
+            w.swayVel += (Math.random() - 0.5) * 18;
+            if (prev - w.length > 0.015) {
+              this.spawnClipping(tipX, tipY, w.color);
+              this.setExpression('surprised', 0.6);
+            }
+          } else if (tool === 'grow') {
+            w.length = Math.min(1.35, w.length + 0.09 * strength);
+            w.swayVel += (Math.random() - 0.5) * 12;
+            if (Math.random() < 0.35) this.spawnSparkle(tipX, tipY, '#6ef7c8');
+            this.setExpression('happy', 0.5);
+          } else if (tool === 'dye') {
+            const col = options.color || '#ff5ca8';
+            w.color = col === 'rainbow' ? RAINBOW_HEX[idx % RAINBOW_HEX.length] : col;
+            w.swayVel += dy * 0.25;
+            if (Math.random() < 0.3) this.spawnSparkle(x + (Math.random() - 0.5) * 24, y + (Math.random() - 0.5) * 24, w.color);
+          } else if (tool === 'glitter') {
+            w.glitter = Math.min(1, w.glitter + 0.28);
+            if (Math.random() < 0.45) this.spawnSparkle(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32, '#fff4a3');
+            this.setExpression('proud', 0.6);
+          } else if (tool === 'comb') {
+            w.curl = Math.max(0, w.curl - 0.18 * strength);
+            w.crimp = Math.max(0, w.crimp - 0.18 * strength);
+            w.swayVel += dy * 0.45;
+          } else if (tool === 'curler') {
+            w.curl = Math.min(1, w.curl + 0.20 * strength);
+            w.crimp = Math.max(0, w.crimp - 0.14);
+            w.swayVel += (Math.random() - 0.5) * 14;
+            this.setExpression('proud', 0.6);
+          } else if (tool === 'crimper') {
+            w.crimp = Math.min(1, w.crimp + 0.22 * strength);
+            w.curl = Math.max(0, w.curl - 0.14);
+            w.swayVel += dy * 0.25;
+          } else if (tool === 'shampoo') {
+            w.foam = Math.min(1, w.foam + 0.20 * strength);
+            w.wet = Math.min(1, w.wet + 0.15 * strength);
+            if (Math.random() < 0.4) this.spawnBubble(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32);
+            this.setExpression('giggle', 0.75);
+          } else if (tool === 'shower') {
+            w.foam = Math.max(0, w.foam - 0.25 * strength);
+            w.glitter = Math.max(0, w.glitter - 0.15 * strength);
+            w.wet = Math.min(1, w.wet + 0.2 * strength);
+            w.swayVel += (Math.random() - 0.5) * 12;
+          } else if (tool === 'dryer') {
+            w.wet = Math.max(0, w.wet - 0.25 * strength);
+            w.foam = Math.max(0, w.foam - 0.18 * strength);
+            w.swayVel += (y > tipY ? -1 : 1) * (28 * strength);
+            this.setExpression('giggle', 0.55);
+          }
+        }
+      });
+    }
+
     // Ambient tool particles even if slightly outside strands
     if (tool === 'shower') {
       for (let i = 0; i < 3; i++) {
@@ -582,6 +725,17 @@ export class HairSalonEngine {
       if (s.sway < -110) s.sway = -110;
     }
 
+    // Spring physics on cat whiskers
+    for (let i = 0; i < this.whiskers.length; i++) {
+      const w = this.whiskers[i];
+      const idle = Math.sin(this.time * 2.6 + i * 1.1) * 2.4;
+      const spring = (-w.sway + idle) * 22;
+      w.swayVel = (w.swayVel + spring * dt) * Math.pow(0.06, dt);
+      w.sway += w.swayVel * dt * 6;
+      if (w.sway > 65) w.sway = 65;
+      if (w.sway < -65) w.sway = -65;
+    }
+
     // Particles
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
@@ -629,6 +783,11 @@ export class HairSalonEngine {
 
     // Shampoo foam blobs on hair
     this.drawFoam(ctx);
+
+    // Styleable cat whiskers (on Pip the Cat!)
+    if (this.whiskers.length) {
+      this.drawWhiskers(ctx);
+    }
 
     // Glasses (drawn over front hair / face so they're always crisp and visible!)
     if (this.glasses && this.glasses.shape !== 'none') {
@@ -966,6 +1125,104 @@ export class HairSalonEngine {
     ctx.restore();
   }
 
+  drawWhiskers(ctx) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    this.whiskers.forEach((w) => {
+      const len = w.maxLen * Math.max(0.18, w.length);
+      const dirX = Math.cos(w.angle) * w.side;
+      const dirY = Math.sin(w.angle);
+      const perpX = -dirY * w.side;
+      const perpY = dirX * w.side;
+
+      const steps = 10;
+      const pts = [];
+      for (let i = 0; i <= steps; i++) {
+        const f = i / steps;
+        let px = w.ax + dirX * len * f;
+        let py = w.ay + dirY * len * f + w.sway * f * f;
+
+        // Curling wand makes fancy curly/twirly whiskers!
+        if (w.curl > 0.04) {
+          const spiral = Math.sin(f * Math.PI * (2.5 + w.curl * 2.5)) * (16 * w.curl * f);
+          const tipCurl = f > 0.65 ? (f - 0.65) * 46 * w.curl : 0;
+          px += perpX * spiral;
+          py += perpY * spiral - tipCurl;
+        }
+        // Crimper makes silly zig-zag whiskers!
+        if (w.crimp > 0.04) {
+          const zig = ((i % 2 === 0) ? 1 : -1) * (12 * w.crimp * f);
+          px += perpX * zig;
+          py += perpY * zig;
+        }
+        pts.push({ x: px, y: py });
+      }
+
+      const trace = () => {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const xc = (pts[i].x + pts[i + 1].x) / 2;
+          const yc = (pts[i].y + pts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+        }
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      };
+
+      const baseCol = w.wet > 0.2 ? shadeHex(w.color, 1 - w.wet * 0.18) : w.color;
+      const outlineCol = w.color === '#fffaf2' ? '#9e6b43' : shadeHex(w.color, 0.58);
+
+      // Whisker outline
+      trace();
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 11;
+      ctx.stroke();
+
+      // Whisker main stroke
+      trace();
+      ctx.strokeStyle = baseCol;
+      ctx.lineWidth = 6.5;
+      ctx.stroke();
+
+      // Cute whisker root dot
+      ctx.fillStyle = '#c96f2d';
+      ctx.beginPath();
+      ctx.arc(w.ax, w.ay, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Glitter sparkles on whisker
+      if (w.glitter > 0.08) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, w.glitter);
+        for (let i = 2; i < pts.length; i += 2) {
+          const tw = 0.55 + 0.45 * Math.sin(this.time * 7 + w.index + i);
+          ctx.fillStyle = i % 4 === 0 ? '#ffffff' : '#fff28c';
+          ctx.beginPath();
+          ctx.arc(pts[i].x, pts[i].y, 3.6 * tw, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // Cute mini shampoo bubbles on whisker
+      if (w.foam > 0.15) {
+        const mid = pts[Math.floor(pts.length * 0.55)];
+        const br = 8 + w.foam * 11;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeStyle = 'rgba(170, 220, 255, 0.78)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(mid.x, mid.y, br, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    });
+
+    ctx.restore();
+  }
+
   drawFoam(ctx) {
     ctx.save();
     this.strands.forEach((s, i) => {
@@ -1011,11 +1268,33 @@ export class HairSalonEngine {
     ctx.fill();
     ctx.stroke();
 
-    // Shirt collar / stripe accent
-    ctx.fillStyle = c.shirtAccent;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 202, 54, 24, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Shirt collar / stripe accent (or cat collar with golden bell!)
+    if (c.isCat) {
+      ctx.fillStyle = '#ff5ca8';
+      ctx.strokeStyle = '#c4366e';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.roundRect(cx - 56, cy + 174, 112, 26, 13);
+      ctx.fill();
+      ctx.stroke();
+      // Shiny golden bell
+      ctx.fillStyle = '#ffd43b';
+      ctx.strokeStyle = '#c98a00';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 206, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#8c5a00';
+      ctx.beginPath();
+      ctx.arc(cx, cy + 210, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = c.shirtAccent;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 202, 54, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Neck
     ctx.fillStyle = c.skinShade;
@@ -1029,20 +1308,49 @@ export class HairSalonEngine {
       this.drawMonsterHorn(ctx, cx + 92, cy - 122, 0.32, c.hornColor, c.hornStripe);
     }
 
-    // Ears
-    [-1, 1].forEach((dir) => {
-      ctx.fillStyle = c.skin;
-      ctx.strokeStyle = c.skinShade;
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.ellipse(cx + dir * (this.headRx - 4), cy + 14, 24, 34, dir * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = c.skinShade;
-      ctx.beginPath();
-      ctx.ellipse(cx + dir * (this.headRx - 2), cy + 16, 11, 17, dir * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-    });
+    // Ears (pointy cat ears for Pip, rounded ears for others)
+    if (c.isCat) {
+      [-1, 1].forEach((dir) => {
+        ctx.save();
+        ctx.translate(cx + dir * 102, cy - 116);
+        ctx.rotate(dir * 0.28);
+        // Outer furry ear
+        ctx.fillStyle = c.skin;
+        ctx.strokeStyle = shadeHex(c.skinShade, 0.85);
+        ctx.lineWidth = 6;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-42, 34);
+        ctx.quadraticCurveTo(-18, -42, 0, -68);
+        ctx.quadraticCurveTo(18, -42, 42, 34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // Pink inner ear
+        ctx.fillStyle = '#ff9eb8';
+        ctx.beginPath();
+        ctx.moveTo(-22, 22);
+        ctx.quadraticCurveTo(-8, -22, 0, -40);
+        ctx.quadraticCurveTo(8, -22, 22, 22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+    } else {
+      [-1, 1].forEach((dir) => {
+        ctx.fillStyle = c.skin;
+        ctx.strokeStyle = c.skinShade;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.ellipse(cx + dir * (this.headRx - 4), cy + 14, 24, 34, dir * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = c.skinShade;
+        ctx.beginPath();
+        ctx.ellipse(cx + dir * (this.headRx - 2), cy + 16, 11, 17, dir * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
 
     // Head shape with soft shading gradient
     const headGrad = ctx.createRadialGradient(cx - 35, cy - 45, 20, cx, cy, this.headRy * 1.15);
@@ -1057,6 +1365,39 @@ export class HairSalonEngine {
     ctx.ellipse(cx, cy, this.headRx, this.headRy, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+
+    // Cat tabby stripes & soft cream muzzle
+    if (c.isCat) {
+      ctx.strokeStyle = c.stripeColor || '#c96f2d';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.55;
+      // Forehead tabby "M" stripes
+      [-24, 0, 24].forEach((sx, idx) => {
+        ctx.beginPath();
+        ctx.moveTo(cx + sx, cy - 118);
+        ctx.lineTo(cx + sx * 0.8, cy - (idx === 1 ? 84 : 92));
+        ctx.stroke();
+      });
+      // Cheek stripes
+      [-1, 1].forEach((dir) => {
+        [14, 34].forEach((sy) => {
+          ctx.beginPath();
+          ctx.moveTo(cx + dir * 132, cy + sy);
+          ctx.lineTo(cx + dir * 106, cy + sy + 4);
+          ctx.stroke();
+        });
+      });
+      ctx.globalAlpha = 1;
+
+      // Soft cream muzzle pillows
+      ctx.fillStyle = c.muzzleColor || '#fff2df';
+      ctx.beginPath();
+      ctx.ellipse(cx - 26, cy + 56, 36, 28, -0.1, 0, Math.PI * 2);
+      ctx.ellipse(cx + 26, cy + 56, 36, 28, 0.1, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy + 74, 32, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Monster fluffy cheek tufts / spots
     if (c.isMonster) {
@@ -1138,9 +1479,16 @@ export class HairSalonEngine {
     });
 
     // Cute nose
-    ctx.fillStyle = c.isMonster ? '#ff85b3' : c.skinShade;
+    ctx.fillStyle = c.isMonster ? '#ff85b3' : (c.isCat ? '#ff7aa8' : c.skinShade);
     ctx.beginPath();
-    if (c.isMonster) {
+    if (c.isCat) {
+      // Cute pink cat triangle nose
+      ctx.moveTo(cx - 14, cy + 32);
+      ctx.quadraticCurveTo(cx, cy + 28, cx + 14, cy + 32);
+      ctx.quadraticCurveTo(cx + 8, cy + 44, cx, cy + 48);
+      ctx.quadraticCurveTo(cx - 8, cy + 44, cx - 14, cy + 32);
+      ctx.closePath();
+    } else if (c.isMonster) {
       ctx.ellipse(cx, cy + 36, 16, 11, 0, 0, Math.PI * 2);
     } else {
       ctx.arc(cx, cy + 38, 8, 0, Math.PI * 2);
@@ -1156,6 +1504,18 @@ export class HairSalonEngine {
       ctx.beginPath();
       ctx.ellipse(cx, cy + 84, 16, 20, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
+    } else if (c.isCat && this.expression === 'happy') {
+      // Adorable :3 cat smile!
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 48);
+      ctx.lineTo(cx, cy + 62);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx - 18, cy + 62, 18, 0.05 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx + 18, cy + 62, 18, 0.15 * Math.PI, 0.95 * Math.PI);
       ctx.stroke();
     } else if (this.expression === 'giggle' || this.expression === 'proud') {
       ctx.fillStyle = '#d95375';

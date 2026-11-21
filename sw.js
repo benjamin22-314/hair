@@ -1,4 +1,4 @@
-﻿const CACHE_VERSION = '0.1.3';
+﻿const CACHE_VERSION = '0.1.4';
 const CACHE_NAME = 'hair-salon-v' + CACHE_VERSION;
 
 const ASSETS = [

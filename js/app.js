@@ -116,6 +116,11 @@ function buildCustomerCards() {
       badge.className = 'monster-badge';
       badge.textContent = '👾 Monster';
       card.appendChild(badge);
+    } else if (cust.isCat) {
+      const badge = document.createElement('span');
+      badge.className = 'cat-badge';
+      badge.textContent = '🐱 Cat';
+      card.appendChild(badge);
     }
 
     card.addEventListener('click', () => {
@@ -128,7 +133,7 @@ function buildCustomerCards() {
 
 function openCustomer(cust) {
   engine.loadCustomer(cust);
-  $('#salonCustomerName').textContent = cust.isMonster ? `${cust.name} 👾` : cust.name;
+  $('#salonCustomerName').textContent = cust.isMonster ? `${cust.name} 👾` : (cust.isCat ? `${cust.name} 🐱` : cust.name);
   state.undoStack = [];
   syncUndoBtn();
   state.glassesShape = cust.defaultGlasses ? cust.defaultGlasses.shape : 'none';

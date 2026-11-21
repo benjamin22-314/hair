@@ -1,4 +1,4 @@
-﻿export const APP_VERSION = '0.1.3';
+﻿export const APP_VERSION = '0.1.4';
 
 export const CUSTOMERS = [
   {
@@ -87,17 +87,20 @@ export const CUSTOMERS = [
     id: 'pip',
     name: 'Pip',
     isMonster: false,
-    skin: '#f3cfb3',
-    skinShade: '#d9ae8e',
+    isCat: true,
+    skin: '#f7b978',
+    skinShade: '#df954e',
+    stripeColor: '#c96f2d',
+    muzzleColor: '#fff2df',
     cheeks: '#ff96a8',
-    eyeColor: '#4c7a48',
-    shirt: '#a882ff',
-    shirtAccent: '#7ef0d1',
-    defaultHair: '#d95b2b',
-    defaultLength: 0.65,
-    defaultCurl: 0.35,
+    eyeColor: '#2fa866',
+    shirt: '#9b6bff',
+    shirtAccent: '#ffd43b',
+    defaultHair: '#e88b3c',
+    defaultLength: 0.56,
+    defaultCurl: 0.25,
     defaultGlasses: null,
-    freckles: true
+    freckles: false
   }
 ];
 

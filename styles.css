@@ -260,6 +260,15 @@ body {
   border-radius: 999px;
 }
 
+.cat-badge {
+  font-size: 13px;
+  font-weight: 800;
+  background: #fff0db;
+  color: #c96218;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
 /* ---------- Salon Screen (Landscape-First Tablet Layout) ---------- */
 .salon-top {
   display: flex;
