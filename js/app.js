@@ -28,6 +28,7 @@ const state = {
   strokeModified: false,
   draggingAcc: null,
   pointerDown: false,
+  activePointerId: null,
   lastPt: null
 };
 
@@ -464,9 +465,11 @@ function commitPendingUndo() {
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   snd.init();
-  canvas.setPointerCapture(e.pointerId);
+  if (state.pointerDown && state.activePointerId !== e.pointerId) return;
+  try { canvas.setPointerCapture(e.pointerId); } catch {}
   const pt = getCanvasPoint(e);
   state.pointerDown = true;
+  state.activePointerId = e.pointerId;
   state.lastPt = pt;
   state.pendingUndo = engine.getSnapshot();
   state.strokeModified = false;
@@ -491,7 +494,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
-  if (!state.pointerDown) return;
+  if (!state.pointerDown || e.pointerId !== state.activePointerId) return;
   e.preventDefault();
   const pt = getCanvasPoint(e);
   const dx = state.lastPt ? pt.x - state.lastPt.x : 0;
@@ -514,7 +517,8 @@ canvas.addEventListener('pointermove', (e) => {
   }
 });
 
-function endPointer() {
+function endPointer(e) {
+  if (e && state.activePointerId !== null && e.pointerId !== state.activePointerId) return;
   if (state.draggingAcc) {
     const a = state.draggingAcc;
     if (Math.hypot(a.x - engine.cx, a.y - 728) < 76) {
@@ -524,6 +528,7 @@ function endPointer() {
     }
   }
   state.pointerDown = false;
+  state.activePointerId = null;
   state.draggingAcc = null;
   state.pendingUndo = null;
   state.strokeModified = false;

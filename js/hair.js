@@ -613,7 +613,7 @@ export class HairSalonEngine {
     // Ambient tool particles even if slightly outside strands
     if (tool === 'shower') {
       for (let i = 0; i < 3; i++) {
-        this.particles.push({
+        this.pushParticle({
           type: 'water',
           x: x + (Math.random() - 0.5) * 55,
           y: y + (Math.random() - 0.5) * 20,
@@ -624,7 +624,7 @@ export class HairSalonEngine {
         });
       }
     } else if (tool === 'dryer') {
-      this.particles.push({
+      this.pushParticle({
         type: 'wind',
         x: x + (Math.random() - 0.5) * 40,
         y: y + (Math.random() - 0.5) * 40,
@@ -638,8 +638,15 @@ export class HairSalonEngine {
     return touched;
   }
 
+  pushParticle(p) {
+    if (this.particles.length >= 140) {
+      this.particles.shift();
+    }
+    this.particles.push(p);
+  }
+
   spawnClipping(x, y, color) {
-    this.particles.push({
+    this.pushParticle({
       type: 'clip',
       x,
       y,
@@ -654,7 +661,7 @@ export class HairSalonEngine {
   }
 
   spawnBubble(x, y) {
-    this.particles.push({
+    this.pushParticle({
       type: 'bubble',
       x,
       y,
@@ -666,7 +673,7 @@ export class HairSalonEngine {
   }
 
   spawnSparkle(x, y, color) {
-    this.particles.push({
+    this.pushParticle({
       type: 'sparkle',
       x,
       y,
@@ -1662,15 +1669,16 @@ export class HairSalonEngine {
 
     const lensFill = isShades ? 'rgba(38, 28, 52, 0.82)' : 'rgba(255, 255, 255, 0.24)';
 
-    // Temple arms to ears
+    // Temple arms to ears / outer cheeks (matches Pip's wider kitten head too)
+    const armRx = (this.customer && this.customer.isCat) ? this.headRx * 1.06 : this.headRx;
     ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = 9;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(cx - eyeDx - 40, eyeY - 4);
-    ctx.lineTo(cx - this.headRx - 2, eyeY + 4);
+    ctx.lineTo(cx - armRx - 2, eyeY + 4);
     ctx.moveTo(cx + eyeDx + 40, eyeY - 4);
-    ctx.lineTo(cx + this.headRx + 2, eyeY + 4);
+    ctx.lineTo(cx + armRx + 2, eyeY + 4);
     ctx.stroke();
 
     // Nose bridge
