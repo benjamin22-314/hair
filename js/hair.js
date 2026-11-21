@@ -104,9 +104,9 @@ export class HairSalonEngine {
     }
     const list = [];
     const offsets = [
-      { dy: 48, ang: -0.18 },
-      { dy: 58, ang: 0.02 },
-      { dy: 68, ang: 0.22 }
+      { dy: 46, ang: -0.28 },
+      { dy: 58, ang: 0.0 },
+      { dy: 70, ang: 0.28 }
     ];
     [-1, 1].forEach((side) => {
       offsets.forEach((o, i) => {
@@ -377,13 +377,46 @@ export class HairSalonEngine {
     return { midX, midY, tipX, tipY, len };
   }
 
+  getWhiskerDistance(w, x, y) {
+    const wLen = w.maxLen * Math.max(0.18, w.length);
+    const dirX = Math.cos(w.angle) * w.side;
+    const dirY = Math.sin(w.angle);
+    const tipX = w.ax + dirX * wLen;
+    const tipY = w.ay + dirY * wLen + w.sway;
+
+    let d = Infinity;
+    for (let k = 0; k <= 4; k++) {
+      const f = k / 4;
+      const arch = -Math.sin(f * Math.PI) * 8;
+      const px = w.ax + (tipX - w.ax) * f;
+      const py = w.ay + (tipY - w.ay) * f + arch;
+      const dist = Math.hypot(px - x, py - y);
+      if (dist < d) d = dist;
+    }
+    return { d, tipX, tipY };
+  }
+
+  detectStrokeTarget(tool, x, y) {
+    if (!this.whiskers.length) return 'hair';
+    if (tool === 'shampoo' || tool === 'shower' || tool === 'dryer') return 'both';
+    for (let i = 0; i < this.whiskers.length; i++) {
+      if (this.getWhiskerDistance(this.whiskers[i], x, y).d < 34) {
+        return 'whiskers';
+      }
+    }
+    return 'hair';
+  }
+
   applyTool(tool, x, y, dx, dy, options = {}) {
     let touched = false;
+    const target = options.target || 'both';
+    const allowHair = target === 'hair' || target === 'both';
+    const allowWhiskers = target === 'whiskers' || target === 'both';
     const radius = tool === 'dryer' ? 125 : (tool === 'clippers' ? 74 : 70);
     const isUpdo = this.stylePreset === 'buns' || this.stylePreset === 'pigtails' || this.stylePreset === 'ponytail';
 
     // Direct hit-testing for updo hairpieces (buns, pigtails, high ponytail)
-    if (isUpdo) {
+    if (allowHair && isUpdo) {
       const hitZones = [];
       if (this.stylePreset === 'buns') {
         if (Math.hypot(x - (this.cx - 124), y - (this.cy - 134)) < 78) hitZones.push('left');
@@ -430,7 +463,7 @@ export class HairSalonEngine {
       }
     }
 
-    this.strands.forEach((s, idx) => {
+    if (allowHair) this.strands.forEach((s, idx) => {
       const pt = this.getStrandPoints(s);
       // Sample 5 points along the strand so long hair never has dead zones
       let d = Infinity;
@@ -526,86 +559,84 @@ export class HairSalonEngine {
     });
 
     // Interactive cat whiskers!
-    if (this.whiskers.length) {
-      const wRadius = tool === 'dryer' ? 120 : 62;
+    if (allowWhiskers && this.whiskers.length) {
+      const isAreaTool = tool === 'shampoo' || tool === 'shower' || tool === 'dryer';
+      const wRadius = tool === 'dryer' ? 120 : (isAreaTool ? 62 : 34);
+
+      const candidates = [];
       this.whiskers.forEach((w, idx) => {
-        const wLen = w.maxLen * Math.max(0.18, w.length);
-        const dirX = Math.cos(w.angle) * w.side;
-        const dirY = Math.sin(w.angle);
-        const tipX = w.ax + dirX * wLen;
-        const tipY = w.ay + dirY * wLen + w.sway;
-
-        let d = Infinity;
-        for (let k = 0; k <= 4; k++) {
-          const f = k / 4;
-          const px = w.ax + (tipX - w.ax) * f;
-          const py = w.ay + (tipY - w.ay) * f;
-          const dist = Math.hypot(px - x, py - y);
-          if (dist < d) d = dist;
+        const hit = this.getWhiskerDistance(w, x, y);
+        if (hit.d < wRadius) {
+          candidates.push({ w, idx, d: hit.d, tipX: hit.tipX, tipY: hit.tipY });
         }
+      });
 
-        if (d < wRadius) {
-          touched = true;
-          const strength = 1 - d / wRadius;
-          if (tool === 'scissors') {
-            const prev = w.length;
-            w.length = Math.max(0.18, w.length - 0.08 * strength);
-            w.swayVel += dy * 0.3;
-            if (prev - w.length > 0.015) {
-              this.spawnClipping(tipX, tipY, w.color);
-              this.setExpression('surprised', 0.65);
-            }
-          } else if (tool === 'clippers') {
-            const prev = w.length;
-            w.length = Math.max(0.18, w.length - 0.14 * strength);
-            w.swayVel += (Math.random() - 0.5) * 18;
-            if (prev - w.length > 0.015) {
-              this.spawnClipping(tipX, tipY, w.color);
-              this.setExpression('surprised', 0.6);
-            }
-          } else if (tool === 'grow') {
-            w.length = Math.min(1.35, w.length + 0.09 * strength);
-            w.swayVel += (Math.random() - 0.5) * 12;
-            if (Math.random() < 0.35) this.spawnSparkle(tipX, tipY, '#6ef7c8');
-            this.setExpression('happy', 0.5);
-          } else if (tool === 'dye') {
-            const col = options.color || '#ff5ca8';
-            w.color = col === 'rainbow' ? RAINBOW_HEX[idx % RAINBOW_HEX.length] : col;
-            w.swayVel += dy * 0.25;
-            if (Math.random() < 0.3) this.spawnSparkle(x + (Math.random() - 0.5) * 24, y + (Math.random() - 0.5) * 24, w.color);
-          } else if (tool === 'glitter') {
-            w.glitter = Math.min(1, w.glitter + 0.28);
-            if (Math.random() < 0.45) this.spawnSparkle(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32, '#fff4a3');
-            this.setExpression('proud', 0.6);
-          } else if (tool === 'comb') {
-            w.curl = Math.max(0, w.curl - 0.18 * strength);
-            w.crimp = Math.max(0, w.crimp - 0.18 * strength);
-            w.swayVel += dy * 0.45;
-          } else if (tool === 'curler') {
-            w.curl = Math.min(1, w.curl + 0.20 * strength);
-            w.crimp = Math.max(0, w.crimp - 0.14);
-            w.swayVel += (Math.random() - 0.5) * 14;
-            this.setExpression('proud', 0.6);
-          } else if (tool === 'crimper') {
-            w.crimp = Math.min(1, w.crimp + 0.22 * strength);
-            w.curl = Math.max(0, w.curl - 0.14);
-            w.swayVel += dy * 0.25;
-          } else if (tool === 'shampoo') {
-            w.foam = Math.min(1, w.foam + 0.20 * strength);
-            w.wet = Math.min(1, w.wet + 0.15 * strength);
-            if (Math.random() < 0.4) this.spawnBubble(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32);
-            this.setExpression('giggle', 0.75);
-          } else if (tool === 'shower') {
-            w.foam = Math.max(0, w.foam - 0.25 * strength);
-            w.glitter = Math.max(0, w.glitter - 0.15 * strength);
-            w.wet = Math.min(1, w.wet + 0.2 * strength);
-            w.swayVel += (Math.random() - 0.5) * 12;
-          } else if (tool === 'dryer') {
-            w.wet = Math.max(0, w.wet - 0.25 * strength);
-            w.foam = Math.max(0, w.foam - 0.18 * strength);
-            w.swayVel += (y > tipY ? -1 : 1) * (28 * strength);
-            this.setExpression('giggle', 0.55);
+      // For precision styling tools, target only the single closest whisker
+      const targets = (!isAreaTool && candidates.length > 1)
+        ? [candidates.reduce((best, cur) => (cur.d < best.d ? cur : best))]
+        : candidates;
+
+      targets.forEach(({ w, idx, d, tipX, tipY }) => {
+        touched = true;
+        const strength = 1 - d / wRadius;
+        if (tool === 'scissors') {
+          const prev = w.length;
+          w.length = Math.max(0.18, w.length - 0.08 * strength);
+          w.swayVel += dy * 0.3;
+          if (prev - w.length > 0.015) {
+            this.spawnClipping(tipX, tipY, w.color);
+            this.setExpression('surprised', 0.65);
           }
+        } else if (tool === 'clippers') {
+          const prev = w.length;
+          w.length = Math.max(0.18, w.length - 0.14 * strength);
+          w.swayVel += (Math.random() - 0.5) * 18;
+          if (prev - w.length > 0.015) {
+            this.spawnClipping(tipX, tipY, w.color);
+            this.setExpression('surprised', 0.6);
+          }
+        } else if (tool === 'grow') {
+          w.length = Math.min(1.35, w.length + 0.09 * strength);
+          w.swayVel += (Math.random() - 0.5) * 12;
+          if (Math.random() < 0.35) this.spawnSparkle(tipX, tipY, '#6ef7c8');
+          this.setExpression('happy', 0.5);
+        } else if (tool === 'dye') {
+          const col = options.color || '#ff5ca8';
+          w.color = col === 'rainbow' ? RAINBOW_HEX[idx % RAINBOW_HEX.length] : col;
+          w.swayVel += dy * 0.25;
+          if (Math.random() < 0.3) this.spawnSparkle(x + (Math.random() - 0.5) * 24, y + (Math.random() - 0.5) * 24, w.color);
+        } else if (tool === 'glitter') {
+          w.glitter = Math.min(1, w.glitter + 0.28);
+          if (Math.random() < 0.45) this.spawnSparkle(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32, '#fff4a3');
+          this.setExpression('proud', 0.6);
+        } else if (tool === 'comb') {
+          w.curl = Math.max(0, w.curl - 0.18 * strength);
+          w.crimp = Math.max(0, w.crimp - 0.18 * strength);
+          w.swayVel += dy * 0.45;
+        } else if (tool === 'curler') {
+          w.curl = Math.min(1, w.curl + 0.20 * strength);
+          w.crimp = Math.max(0, w.crimp - 0.14);
+          w.swayVel += (Math.random() - 0.5) * 14;
+          this.setExpression('proud', 0.6);
+        } else if (tool === 'crimper') {
+          w.crimp = Math.min(1, w.crimp + 0.22 * strength);
+          w.curl = Math.max(0, w.curl - 0.14);
+          w.swayVel += dy * 0.25;
+        } else if (tool === 'shampoo') {
+          w.foam = Math.min(1, w.foam + 0.20 * strength);
+          w.wet = Math.min(1, w.wet + 0.15 * strength);
+          if (Math.random() < 0.4) this.spawnBubble(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32);
+          this.setExpression('giggle', 0.75);
+        } else if (tool === 'shower') {
+          w.foam = Math.max(0, w.foam - 0.25 * strength);
+          w.glitter = Math.max(0, w.glitter - 0.15 * strength);
+          w.wet = Math.min(1, w.wet + 0.2 * strength);
+          w.swayVel += (Math.random() - 0.5) * 12;
+        } else if (tool === 'dryer') {
+          w.wet = Math.max(0, w.wet - 0.25 * strength);
+          w.foam = Math.max(0, w.foam - 0.18 * strength);
+          w.swayVel += (y > tipY ? -1 : 1) * (28 * strength);
+          this.setExpression('giggle', 0.55);
         }
       });
     }

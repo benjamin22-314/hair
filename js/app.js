@@ -26,6 +26,7 @@ const state = {
   undoStack: [],
   pendingUndo: null,
   strokeModified: false,
+  strokeTarget: 'both',
   draggingAcc: null,
   pointerDown: false,
   activePointerId: null,
@@ -484,8 +485,12 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 
   if (state.tool && state.tool !== 'none' && state.tool !== 'drag') {
+    state.strokeTarget = engine.detectStrokeTarget(state.tool, pt.x, pt.y);
     engine.toolCursor = { x: pt.x, y: pt.y, icon: TOOL_ICONS[state.tool] || '', active: true };
-    const touched = engine.applyTool(state.tool, pt.x, pt.y, 0, 0, { color: state.hairColor });
+    const touched = engine.applyTool(state.tool, pt.x, pt.y, 0, 0, {
+      color: state.hairColor,
+      target: state.strokeTarget
+    });
     if (touched) commitPendingUndo();
     if (touched || state.tool === 'shower' || state.tool === 'dryer') {
       playToolSound(state.tool);
@@ -509,7 +514,10 @@ canvas.addEventListener('pointermove', (e) => {
 
   if (state.tool && state.tool !== 'none' && state.tool !== 'drag') {
     engine.toolCursor = { x: pt.x, y: pt.y, icon: TOOL_ICONS[state.tool] || '', active: true };
-    const touched = engine.applyTool(state.tool, pt.x, pt.y, dx, dy, { color: state.hairColor });
+    const touched = engine.applyTool(state.tool, pt.x, pt.y, dx, dy, {
+      color: state.hairColor,
+      target: state.strokeTarget
+    });
     if (touched) commitPendingUndo();
     if (touched || state.tool === 'shower' || state.tool === 'dryer') {
       playToolSound(state.tool);
