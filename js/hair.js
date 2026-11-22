@@ -40,6 +40,7 @@ export class HairSalonEngine {
     this.whiskers = [];
     this.stylePreset = 'loose';
     this.presetState = this.defaultPresetState();
+    this.earState = this.defaultEarState();
     this.glasses = null;
     this.accessories = [];
     this.activeAccUid = null;
@@ -84,10 +85,20 @@ export class HairSalonEngine {
     };
   }
 
+  defaultEarState() {
+    return {
+      leftColor: null,
+      rightColor: null,
+      leftGlitter: 0,
+      rightGlitter: 0
+    };
+  }
+
   loadCustomer(customer) {
     this.customer = customer;
     this.stylePreset = 'loose';
     this.presetState = this.defaultPresetState();
+    this.earState = this.defaultEarState();
     this.glasses = customer.defaultGlasses ? { ...customer.defaultGlasses } : null;
     this.accessories = [];
     this.particles = [];
@@ -205,6 +216,7 @@ export class HairSalonEngine {
     return {
       stylePreset: this.stylePreset,
       presetState: { ...this.presetState },
+      earState: { ...this.earState },
       glasses: this.glasses ? { ...this.glasses } : null,
       accessories: this.accessories.map((a) => ({ ...a })),
       strands: this.strands.map((s) => ({
@@ -232,6 +244,7 @@ export class HairSalonEngine {
     if (!snap) return;
     this.stylePreset = snap.stylePreset;
     this.presetState = snap.presetState ? { ...snap.presetState } : this.defaultPresetState();
+    this.earState = snap.earState ? { ...snap.earState } : this.defaultEarState();
     this.glasses = snap.glasses ? { ...snap.glasses } : null;
     this.accessories = snap.accessories.map((a) => ({ ...a }));
     snap.strands.forEach((st, i) => {
@@ -284,10 +297,18 @@ export class HairSalonEngine {
       this.presetState.leftColor = RAINBOW_HEX[0];
       this.presetState.rightColor = RAINBOW_HEX[4];
       this.presetState.topColor = RAINBOW_HEX[5];
+      if (this.customer && (this.customer.isCat || this.customer.isDog)) {
+        this.earState.leftColor = RAINBOW_HEX[0];
+        this.earState.rightColor = RAINBOW_HEX[4];
+      }
     } else {
       this.presetState.leftColor = hex;
       this.presetState.rightColor = hex;
       this.presetState.topColor = hex;
+      if (this.customer && (this.customer.isCat || this.customer.isDog)) {
+        this.earState.leftColor = hex;
+        this.earState.rightColor = hex;
+      }
     }
     for (let i = 0; i < 24; i++) {
       this.spawnSparkle(
@@ -396,9 +417,28 @@ export class HairSalonEngine {
     return { d, tipX, tipY };
   }
 
+  hitPetEar(x, y) {
+    if (!this.customer) return null;
+    if (this.customer.isCat) {
+      if (Math.hypot(x - (this.cx - 106), y - (this.cy - 134)) < 56) return 'left';
+      if (Math.hypot(x - (this.cx + 106), y - (this.cy - 134)) < 56) return 'right';
+    } else if (this.customer.isDog) {
+      const dxL = (x - (this.cx - 150)) / 50;
+      const dyL = (y - (this.cy + 4)) / 96;
+      if (dxL * dxL + dyL * dyL <= 1) return 'left';
+      const dxR = (x - (this.cx + 150)) / 50;
+      const dyR = (y - (this.cy + 4)) / 96;
+      if (dxR * dxR + dyR * dyR <= 1) return 'right';
+    }
+    return null;
+  }
+
   detectStrokeTarget(tool, x, y) {
-    if (!this.whiskers.length) return 'hair';
     if (tool === 'shampoo' || tool === 'shower' || tool === 'dryer') return 'both';
+    if ((tool === 'dye' || tool === 'glitter') && this.hitPetEar(x, y)) {
+      return 'ears';
+    }
+    if (!this.whiskers.length) return 'hair';
     for (let i = 0; i < this.whiskers.length; i++) {
       if (this.getWhiskerDistance(this.whiskers[i], x, y).d < 34) {
         return 'whiskers';
@@ -412,8 +452,34 @@ export class HairSalonEngine {
     const target = options.target || 'both';
     const allowHair = target === 'hair' || target === 'both';
     const allowWhiskers = target === 'whiskers' || target === 'both';
+    const allowEars = target === 'ears' || target === 'both';
     const radius = tool === 'dryer' ? 125 : (tool === 'clippers' ? 74 : 70);
     const isUpdo = this.stylePreset === 'buns' || this.stylePreset === 'pigtails' || this.stylePreset === 'ponytail';
+
+    // Pet ear colouring / glittering / rinsing (Pip the Cat & Zara the Dog)
+    if (allowEars && this.customer && (this.customer.isCat || this.customer.isDog)) {
+      const earSide = this.hitPetEar(x, y);
+      if (earSide) {
+        if (tool === 'dye') {
+          touched = true;
+          const col = options.color || '#ff5ca8';
+          const pick = col === 'rainbow' ? RAINBOW_HEX[earSide === 'left' ? 0 : 4] : col;
+          this.earState[earSide + 'Color'] = pick;
+          if (Math.random() < 0.35) this.spawnSparkle(x + (Math.random() - 0.5) * 28, y + (Math.random() - 0.5) * 28, pick);
+          this.setExpression('proud', 0.7);
+        } else if (tool === 'glitter') {
+          touched = true;
+          this.earState[earSide + 'Glitter'] = Math.min(1, this.earState[earSide + 'Glitter'] + 0.25);
+          if (Math.random() < 0.45) this.spawnSparkle(x + (Math.random() - 0.5) * 32, y + (Math.random() - 0.5) * 32, '#fff4a3');
+          this.setExpression('proud', 0.7);
+        } else if (tool === 'shower') {
+          if (this.earState[earSide + 'Glitter'] > 0) {
+            this.earState[earSide + 'Glitter'] = Math.max(0, this.earState[earSide + 'Glitter'] - 0.15);
+            touched = true;
+          }
+        }
+      }
+    }
 
     // Direct hit-testing for updo hairpieces (buns, pigtails, high ponytail)
     if (allowHair && isUpdo) {
@@ -1295,12 +1361,15 @@ export class HairSalonEngine {
     const cy = this.cy;
     ctx.save();
     [-1, 1].forEach((dir) => {
+      const side = dir < 0 ? 'left' : 'right';
+      const earCol = this.earState[side + 'Color'] || c.skin;
+      const earGlit = this.earState[side + 'Glitter'] || 0;
       ctx.save();
       ctx.translate(cx + dir * 106, cy - 114);
       ctx.rotate(dir * 0.28);
       // Outer furry ear
-      ctx.fillStyle = c.skin;
-      ctx.strokeStyle = shadeHex(c.skinShade, 0.85);
+      ctx.fillStyle = earCol;
+      ctx.strokeStyle = shadeHex(earCol, 0.72);
       ctx.lineWidth = 6;
       ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -1318,6 +1387,17 @@ export class HairSalonEngine {
       ctx.quadraticCurveTo(8, -22, 22, 18);
       ctx.closePath();
       ctx.fill();
+      // Glitter sparkles on ear
+      if (earGlit > 0.08) {
+        ctx.globalAlpha = Math.min(1, earGlit);
+        [[-16, 2], [14, -4], [0, -28], [-8, -14], [12, 12]].forEach(([gx, gy], i) => {
+          const tw = 0.55 + 0.45 * Math.sin(this.time * 7 + i + dir);
+          ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#fff28c';
+          ctx.beginPath();
+          ctx.arc(gx, gy, 3.6 * tw, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
       ctx.restore();
     });
     ctx.restore();
@@ -1327,10 +1407,13 @@ export class HairSalonEngine {
     const c = this.customer;
     const cx = this.cx;
     const cy = this.cy;
-    const earCol = c.earColor || '#8c532c';
+    const defaultCol = c.earColor || '#8c532c';
     const sway = Math.sin(this.time * 1.9) * 3;
     ctx.save();
     [-1, 1].forEach((dir) => {
+      const side = dir < 0 ? 'left' : 'right';
+      const earCol = this.earState[side + 'Color'] || defaultCol;
+      const earGlit = this.earState[side + 'Glitter'] || 0;
       ctx.save();
       ctx.translate(cx + dir * 130, cy - 68);
       ctx.rotate(dir * (0.14 + sway * 0.008));
@@ -1356,6 +1439,18 @@ export class HairSalonEngine {
       ctx.moveTo(dir * 24, 18);
       ctx.quadraticCurveTo(dir * 42, 72, dir * 28, 128);
       ctx.stroke();
+
+      // Glitter sparkles on floppy ear
+      if (earGlit > 0.08) {
+        ctx.globalAlpha = Math.min(1, earGlit);
+        [[dir * 18, 34], [dir * 30, 74], [dir * 8, 96], [dir * 22, 130], [dir * 4, 56]].forEach(([gx, gy], i) => {
+          const tw = 0.55 + 0.45 * Math.sin(this.time * 7 + i + dir);
+          ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#fff28c';
+          ctx.beginPath();
+          ctx.arc(gx, gy, 3.8 * tw, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
       ctx.restore();
     });
     ctx.restore();
