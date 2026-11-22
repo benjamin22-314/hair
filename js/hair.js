@@ -800,8 +800,10 @@ export class HairSalonEngine {
     this.drawBackdrop(ctx);
     if (!this.customer) return;
 
-    // Subtle salon chair back
-    this.drawChair(ctx);
+    // Subtle salon chair back (only in the salon scene)
+    if (this.backdropId === 'salon') {
+      this.drawChair(ctx);
+    }
 
     // Style-specific back buns/pigtails/ponytail
     this.drawPresetBack(ctx);

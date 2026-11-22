@@ -1,4 +1,4 @@
-﻿export const APP_VERSION = '0.1.8';
+﻿export const APP_VERSION = '0.1.9';
 
 export const CUSTOMERS = [
   {
@@ -174,6 +174,12 @@ export const ACCESSORIES = [
 export const BACKDROPS = [
   { id: 'salon', label: 'Salon', icon: '🪞', image: './assets/backdrop-salon.jpg', fallback: ['#ffe8f4', '#f2e6ff'] },
   { id: 'rainbow', label: 'Rainbow', icon: '🌈', image: './assets/backdrop-rainbow.jpg', fallback: ['#d9f2ff', '#ffe6f5'] },
+  { id: 'vet', label: 'Vet', icon: '🐾', image: './assets/backdrop-vet.jpg', fallback: ['#dff7ee', '#fff7e8'] },
+  { id: 'doctor', label: 'Doctor', icon: '🩺', image: './assets/backdrop-doctor.jpg', fallback: ['#dff0ff', '#fff9eb'] },
+  { id: 'unicorns', label: 'Unicorns', icon: '🦄', image: './assets/backdrop-unicorns.jpg', fallback: ['#ffe6f7', '#e6f2ff'] },
+  { id: 'moon', label: 'Moon', icon: '🌕', image: './assets/backdrop-moon.jpg', fallback: ['#2b235a', '#5a4491'] },
+  { id: 'car', label: 'Car', icon: '🚗', image: './assets/backdrop-car.jpg', fallback: ['#cceeff', '#e6f7df'] },
+  { id: 'ocean', label: 'Ocean', icon: '🐢', image: './assets/backdrop-ocean.jpg', fallback: ['#b5f2f5', '#7fd4e6'] },
   { id: 'stars', label: 'Stars', icon: '🌙', image: null, fallback: ['#2b235a', '#64449c'], pattern: 'stars' },
   { id: 'hearts', label: 'Hearts', icon: '💕', image: null, fallback: ['#ffd4e8', '#fff1c9'], pattern: 'hearts' }
 ];

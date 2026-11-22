@@ -1,4 +1,4 @@
-﻿const CACHE_VERSION = '0.1.8';
+﻿const CACHE_VERSION = '0.1.9';
 const CACHE_NAME = 'hair-salon-v' + CACHE_VERSION;
 
 const ASSETS = [
@@ -12,6 +12,12 @@ const ASSETS = [
   './apple-touch-icon.png',
   './assets/backdrop-salon.jpg',
   './assets/backdrop-rainbow.jpg',
+  './assets/backdrop-vet.jpg',
+  './assets/backdrop-doctor.jpg',
+  './assets/backdrop-unicorns.jpg',
+  './assets/backdrop-moon.jpg',
+  './assets/backdrop-car.jpg',
+  './assets/backdrop-ocean.jpg',
   './js/config.js',
   './js/audio.js',
   './js/storage.js',
