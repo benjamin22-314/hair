@@ -1,4 +1,4 @@
-﻿export const APP_VERSION = '0.1.7';
+﻿export const APP_VERSION = '0.1.8';
 
 export const CUSTOMERS = [
   {
@@ -71,15 +71,19 @@ export const CUSTOMERS = [
     id: 'zara',
     name: 'Zara',
     isMonster: false,
-    skin: '#c98a5b',
-    skinShade: '#aa6f44',
-    cheeks: '#e87c86',
-    eyeColor: '#36231a',
-    shirt: '#ff8a5b',
-    shirtAccent: '#fff0a6',
-    defaultHair: '#2f1e2e',
-    defaultLength: 0.74,
-    defaultCurl: 0.4,
+    isDog: true,
+    skin: '#d99b66',
+    skinShade: '#b87a46',
+    patchColor: '#8c532c',
+    earColor: '#8c532c',
+    muzzleColor: '#fff1db',
+    cheeks: '#f08a94',
+    eyeColor: '#3b2216',
+    shirt: '#29c7b8',
+    shirtAccent: '#ffd43b',
+    defaultHair: '#7a4522',
+    defaultLength: 0.62,
+    defaultCurl: 0.45,
     defaultGlasses: { shape: 'heart', color: '#8f5bff' },
     freckles: false
   },

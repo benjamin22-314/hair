@@ -98,7 +98,7 @@ export class HairSalonEngine {
   }
 
   buildWhiskers(customer) {
-    if (!customer || !customer.isCat) {
+    if (!customer || (!customer.isCat && !customer.isDog)) {
       this.whiskers = [];
       return;
     }
@@ -819,9 +819,11 @@ export class HairSalonEngine {
       if (s.layer === 'front') this.drawStrand(ctx, s);
     });
 
-    // Draw Pip's pointy cat ears cleanly on top of front hair so they're always unmistakable
+    // Draw Pip's pointy cat ears or Zara's floppy dog ears cleanly on top of front hair
     if (this.customer.isCat) {
       this.drawCatEars(ctx);
+    } else if (this.customer.isDog) {
+      this.drawDogEars(ctx);
     }
 
     // Shampoo foam blobs on hair
@@ -1319,6 +1321,44 @@ export class HairSalonEngine {
     ctx.restore();
   }
 
+  drawDogEars(ctx) {
+    const c = this.customer;
+    const cx = this.cx;
+    const cy = this.cy;
+    const earCol = c.earColor || '#8c532c';
+    const sway = Math.sin(this.time * 1.9) * 3;
+    ctx.save();
+    [-1, 1].forEach((dir) => {
+      ctx.save();
+      ctx.translate(cx + dir * 130, cy - 68);
+      ctx.rotate(dir * (0.14 + sway * 0.008));
+      // Soft floppy puppy ear drooping gently down the cheek
+      ctx.fillStyle = earCol;
+      ctx.strokeStyle = shadeHex(earCol, 0.65);
+      ctx.lineWidth = 6;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(dir * 52, -14, dir * 74, 82, dir * 40, 152);
+      ctx.bezierCurveTo(dir * 18, 178, -dir * 20, 166, -dir * 16, 122);
+      ctx.bezierCurveTo(-dir * 14, 72, -dir * 16, 20, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Subtle warm highlight along outer edge of floppy ear
+      ctx.strokeStyle = lightenHex(earCol, 0.22);
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(dir * 24, 18);
+      ctx.quadraticCurveTo(dir * 42, 72, dir * 28, 128);
+      ctx.stroke();
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
   drawFoam(ctx) {
     ctx.save();
     this.strands.forEach((s, i) => {
@@ -1351,8 +1391,9 @@ export class HairSalonEngine {
 
     ctx.save();
 
-    // Shoulders & shirt (or furry cat body + fluffy cream chest patch for Pip!)
-    const bodyCol = c.isCat ? c.skin : c.shirt;
+    // Shoulders & shirt (or furry body + fluffy cream chest patch for Pip & Zara!)
+    const isPet = c.isCat || c.isDog;
+    const bodyCol = isPet ? c.skin : c.shirt;
     ctx.fillStyle = bodyCol;
     ctx.strokeStyle = shadeHex(bodyCol, 0.72);
     ctx.lineWidth = 6;
@@ -1365,7 +1406,7 @@ export class HairSalonEngine {
     ctx.fill();
     ctx.stroke();
 
-    if (c.isCat) {
+    if (isPet) {
       // Fluffy cream chest fur patch
       ctx.fillStyle = c.muzzleColor || '#fff2df';
       ctx.beginPath();
@@ -1378,22 +1419,23 @@ export class HairSalonEngine {
       ctx.fill();
     }
 
-    // Neck (drawn BEFORE cat collar so collar wraps cleanly in front!)
+    // Neck (drawn BEFORE pet collar so collar wraps cleanly in front!)
     ctx.fillStyle = c.skinShade;
     ctx.beginPath();
     ctx.roundRect(cx - 34, cy + 135, 68, 72, 26);
     ctx.fill();
 
-    // Cat pink collar & shiny golden bell in front of neck
-    if (c.isCat) {
-      ctx.fillStyle = '#ff5ca8';
-      ctx.strokeStyle = '#c4366e';
+    // Pet collar & shiny golden bell (Pip) or dog tag (Zara) in front of neck
+    if (isPet) {
+      const collarCol = c.isDog ? '#29c7b8' : '#ff5ca8';
+      ctx.fillStyle = collarCol;
+      ctx.strokeStyle = shadeHex(collarCol, 0.72);
       ctx.lineWidth = 5;
       ctx.beginPath();
       ctx.roundRect(cx - 56, cy + 172, 112, 24, 12);
       ctx.fill();
       ctx.stroke();
-      // Shiny golden bell
+      // Shiny golden bell / dog tag
       ctx.fillStyle = '#ffd43b';
       ctx.strokeStyle = '#c98a00';
       ctx.lineWidth = 4;
@@ -1401,10 +1443,18 @@ export class HairSalonEngine {
       ctx.arc(cx, cy + 204, 18, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#8c5a00';
-      ctx.beginPath();
-      ctx.arc(cx, cy + 208, 4.5, 0, Math.PI * 2);
-      ctx.fill();
+      if (c.isCat) {
+        ctx.fillStyle = '#8c5a00';
+        ctx.beginPath();
+        ctx.arc(cx, cy + 208, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Cute tiny paw/heart shine on dog tag
+        ctx.fillStyle = '#fff5b8';
+        ctx.beginPath();
+        ctx.arc(cx - 5, cy + 199, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Monster cute striped horns!
@@ -1413,8 +1463,8 @@ export class HairSalonEngine {
       this.drawMonsterHorn(ctx, cx + 92, cy - 122, 0.32, c.hornColor, c.hornStripe);
     }
 
-    // Ears (rounded ears for non-cats; Pip's cat ears are drawn on top of front hair)
-    if (!c.isCat) {
+    // Ears (rounded ears for non-pets; Pip's cat ears & Zara's floppy dog ears draw over front hair)
+    if (!isPet) {
       [-1, 1].forEach((dir) => {
         ctx.fillStyle = c.skin;
         ctx.strokeStyle = c.skinShade;
@@ -1498,6 +1548,24 @@ export class HairSalonEngine {
       ctx.fill();
     }
 
+    // Cute puppy eye patch & soft cream snout for Zara the Dog!
+    if (c.isDog) {
+      ctx.fillStyle = c.patchColor || '#8c532c';
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.ellipse(cx - 56, cy + 4, 44, 38, -0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Soft cream puppy muzzle/snout
+      ctx.fillStyle = c.muzzleColor || '#fff1db';
+      ctx.beginPath();
+      ctx.ellipse(cx - 28, cy + 60, 40, 32, -0.08, 0, Math.PI * 2);
+      ctx.ellipse(cx + 28, cy + 60, 40, 32, 0.08, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy + 78, 38, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Monster fluffy cheek tufts / spots
     if (c.isMonster) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
@@ -1526,8 +1594,16 @@ export class HairSalonEngine {
       });
     }
 
-    // Eyebrows (skip human eyebrows on Pip the Cat)
-    if (!c.isCat) {
+    // Eyebrows (skip human eyebrows on Pip the Cat; cute puppy brow dots on Zara!)
+    if (c.isDog) {
+      ctx.fillStyle = c.muzzleColor || '#fff1db';
+      const browLift = this.expression === 'surprised' ? -8 : 0;
+      [-1, 1].forEach((dir) => {
+        ctx.beginPath();
+        ctx.ellipse(cx + dir * 52, cy - 36 + browLift, 14, 8, dir * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    } else if (!c.isCat) {
       ctx.strokeStyle = c.isMonster ? '#3a225d' : shadeHex(c.defaultHair, 0.85);
       ctx.lineWidth = 7;
       ctx.lineCap = 'round';
@@ -1584,7 +1660,7 @@ export class HairSalonEngine {
     });
 
     // Cute nose
-    ctx.fillStyle = c.isMonster ? '#ff85b3' : (c.isCat ? '#ff7aa8' : c.skinShade);
+    ctx.fillStyle = c.isMonster ? '#ff85b3' : (c.isCat ? '#ff7aa8' : (c.isDog ? '#3d2318' : c.skinShade));
     ctx.beginPath();
     if (c.isCat) {
       // Cute pink cat triangle nose
@@ -1593,6 +1669,9 @@ export class HairSalonEngine {
       ctx.quadraticCurveTo(cx + 8, cy + 44, cx, cy + 48);
       ctx.quadraticCurveTo(cx - 8, cy + 44, cx - 14, cy + 32);
       ctx.closePath();
+    } else if (c.isDog) {
+      // Big shiny dark-brown puppy nose
+      ctx.ellipse(cx, cy + 39, 22, 16, 0, 0, Math.PI * 2);
     } else if (c.isMonster) {
       ctx.ellipse(cx, cy + 36, 16, 11, 0, 0, Math.PI * 2);
     } else {
@@ -1600,8 +1679,16 @@ export class HairSalonEngine {
     }
     ctx.fill();
 
+    // Glossy highlight on puppy nose
+    if (c.isDog) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(cx - 7, cy + 34, 6, 3.5, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Mouth with expressions
-    ctx.strokeStyle = '#a83c5c';
+    ctx.strokeStyle = c.isDog ? '#5c3424' : '#a83c5c';
     ctx.lineWidth = 6.5;
     ctx.lineCap = 'round';
     if (this.expression === 'surprised') {
@@ -1610,17 +1697,29 @@ export class HairSalonEngine {
       ctx.ellipse(cx, cy + 84, 16, 20, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-    } else if (c.isCat && this.expression === 'happy') {
-      // Adorable :3 cat smile!
+    } else if ((c.isCat || c.isDog) && this.expression === 'happy') {
+      // Cute peeking pink puppy tongue for Zara!
+      if (c.isDog) {
+        ctx.fillStyle = '#ff85a8';
+        ctx.strokeStyle = '#c44b6d';
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 84, 15, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#5c3424';
+        ctx.lineWidth = 6.5;
+      }
+      // Adorable :3 pet smile!
       ctx.beginPath();
-      ctx.moveTo(cx, cy + 48);
-      ctx.lineTo(cx, cy + 62);
+      ctx.moveTo(cx, cy + (c.isDog ? 54 : 48));
+      ctx.lineTo(cx, cy + 66);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(cx - 18, cy + 62, 18, 0.05 * Math.PI, 0.85 * Math.PI);
+      ctx.arc(cx - 18, cy + 66, 18, 0.05 * Math.PI, 0.85 * Math.PI);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(cx + 18, cy + 62, 18, 0.15 * Math.PI, 0.95 * Math.PI);
+      ctx.arc(cx + 18, cy + 66, 18, 0.15 * Math.PI, 0.95 * Math.PI);
       ctx.stroke();
     } else if (this.expression === 'giggle' || this.expression === 'proud') {
       ctx.fillStyle = '#d95375';
