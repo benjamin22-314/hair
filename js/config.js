@@ -1,4 +1,4 @@
-﻿export const APP_VERSION = '0.1.10';
+﻿export const APP_VERSION = '0.2.0';
 
 export const CUSTOMERS = [
   {
@@ -169,6 +169,30 @@ export const ACCESSORIES = [
   { id: 'hat', emoji: '👒', label: 'Hat', defaultY: 0.27, defaultX: 0.50, scale: 1.20 },
   { id: 'rainbow', emoji: '🌈', label: 'Rainbow', defaultY: 0.26, defaultX: 0.50, scale: 1.15 },
   { id: 'sparkle', emoji: '✨', label: 'Sparkle', defaultY: 0.32, defaultX: 0.42, scale: 0.90 }
+];
+
+export const GOWN_DESIGNS = [
+  { id: 'none', icon: '🚫', label: 'Off' },
+  { id: 'plain', icon: '✨', label: 'Plain' },
+  { id: 'stars', icon: '⭐', label: 'Stars' },
+  { id: 'hearts', icon: '💖', label: 'Hearts' },
+  { id: 'paws', icon: '🐾', label: 'Paws' },
+  { id: 'dots', icon: '⚪', label: 'Dots' },
+  { id: 'stripes', icon: '🌈', label: 'Stripes' },
+  { id: 'sparkles', icon: '🌙', label: 'Magic' }
+];
+
+export const GOWN_COLORS = [
+  { id: 'pink', hex: '#ff6ba9' },
+  { id: 'purple', hex: '#9b6bff' },
+  { id: 'blue', hex: '#45b7ff' },
+  { id: 'teal', hex: '#29c7b8' },
+  { id: 'mint', hex: '#52d68a' },
+  { id: 'yellow', hex: '#ffd43b' },
+  { id: 'orange', hex: '#ff8a4c' },
+  { id: 'red', hex: '#ef4456' },
+  { id: 'white', hex: '#ffffff' },
+  { id: 'black', hex: '#382c42' }
 ];
 
 export const BACKDROPS = [

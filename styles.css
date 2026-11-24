@@ -320,7 +320,7 @@ body {
   padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   overflow-y: auto;
   justify-content: space-between;
 }
@@ -330,13 +330,13 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   border: 3px solid transparent;
-  border-radius: 16px;
+  border-radius: 15px;
   background: #fff8fc;
-  padding: 4px;
+  padding: 3px;
   flex: 1;
-  min-height: 48px;
+  min-height: 42px;
   cursor: pointer;
   font-family: inherit;
   color: var(--ink);
@@ -344,7 +344,7 @@ body {
 }
 
 .station-btn .ico {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
 }
 

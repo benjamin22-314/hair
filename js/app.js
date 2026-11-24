@@ -3,6 +3,8 @@ import {
   HAIR_COLORS,
   GLASSES_SHAPES,
   GLASSES_COLORS,
+  GOWN_DESIGNS,
+  GOWN_COLORS,
   STYLE_PRESETS,
   ACCESSORIES,
   BACKDROPS
@@ -23,6 +25,7 @@ const state = {
   hairColor: '#ff5ca8',
   glassesShape: 'round',
   glassesColor: '#e84c8a',
+  gownColor: '#ff6ba9',
   undoStack: [],
   pendingUndo: null,
   strokeModified: false,
@@ -169,7 +172,7 @@ $('#undoBtn').addEventListener('click', () => {
   snd.pop();
   engine.restoreSnapshot(state.undoStack.pop());
   syncUndoBtn();
-  if (state.station === 'glasses' || state.station === 'style') renderTray();
+  if (state.station === 'glasses' || state.station === 'style' || state.station === 'gown') renderTray();
 });
 
 $('#resetBtn').addEventListener('click', () => {
@@ -203,7 +206,7 @@ function selectStation(station) {
     state.tool = 'shampoo';
   } else if (station === 'extras') {
     state.tool = 'drag';
-  } else if (station === 'glasses' || station === 'backdrop') {
+  } else if (station === 'glasses' || station === 'backdrop' || station === 'gown') {
     state.tool = 'none';
   }
 
@@ -239,7 +242,64 @@ function renderTray() {
   const tray = $('#optionTray');
   tray.innerHTML = '';
 
-  if (state.station === 'cut') {
+  if (state.station === 'gown') {
+    tray.appendChild(makeTitle('Salon Gown'));
+    const grid = document.createElement('div');
+    grid.className = 'tool-grid';
+    const curDesign = engine.gown ? engine.gown.design : 'none';
+    GOWN_DESIGNS.forEach((d) => {
+      grid.appendChild(makeToolChip(d.icon, d.label, curDesign === d.id, () => {
+        pushUndo();
+        if (d.id === 'none' && engine.gown) {
+          snd.dryer();
+          if (engine.gownClippings.length) {
+            toast('Hair brushed away — nice & clean! ✨');
+          }
+        } else if (d.id !== 'none') {
+          snd.sparkle();
+        }
+        engine.setGown(d.id, state.gownColor);
+        renderTray();
+      }));
+    });
+    tray.appendChild(grid);
+
+    tray.appendChild(makeTitle('Gown Colour'));
+    const swGrid = document.createElement('div');
+    swGrid.className = 'swatch-grid';
+    const curCol = engine.gown ? engine.gown.color : state.gownColor;
+    GOWN_COLORS.forEach((c) => {
+      const s = document.createElement('button');
+      s.className = 'swatch' + (curCol === c.hex ? ' active' : '');
+      s.style.background = c.hex;
+      s.setAttribute('aria-label', c.id);
+      s.addEventListener('click', () => {
+        pushUndo();
+        snd.pop();
+        state.gownColor = c.hex;
+        const designToUse = engine.gown ? engine.gown.design : 'stars';
+        engine.setGown(designToUse, c.hex);
+        renderTray();
+      });
+      swGrid.appendChild(s);
+    });
+    tray.appendChild(swGrid);
+
+    const shakeBtn = document.createElement('button');
+    shakeBtn.className = 'btn btn-mint tray-action-btn';
+    shakeBtn.textContent = '💨 Shake Off Hair';
+    shakeBtn.addEventListener('click', () => {
+      if (!engine.gownClippings.length && !engine.bodyClippings.length) {
+        toast('Already clean! ✨');
+        return;
+      }
+      pushUndo();
+      snd.dryer();
+      engine.shakeOffClippings();
+      toast('All brushed clean! ✨');
+    });
+    tray.appendChild(shakeBtn);
+  } else if (state.station === 'cut') {
     tray.appendChild(makeTitle('Cut & Grow'));
     const grid = document.createElement('div');
     grid.className = 'tool-grid';

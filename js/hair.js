@@ -41,6 +41,9 @@ export class HairSalonEngine {
     this.stylePreset = 'loose';
     this.presetState = this.defaultPresetState();
     this.earState = this.defaultEarState();
+    this.gown = null;
+    this.bodyClippings = [];
+    this.gownClippings = [];
     this.glasses = null;
     this.accessories = [];
     this.activeAccUid = null;
@@ -99,6 +102,9 @@ export class HairSalonEngine {
     this.stylePreset = 'loose';
     this.presetState = this.defaultPresetState();
     this.earState = this.defaultEarState();
+    this.gown = null;
+    this.bodyClippings = [];
+    this.gownClippings = [];
     this.glasses = customer.defaultGlasses ? { ...customer.defaultGlasses } : null;
     this.accessories = [];
     this.particles = [];
@@ -217,6 +223,9 @@ export class HairSalonEngine {
       stylePreset: this.stylePreset,
       presetState: { ...this.presetState },
       earState: { ...this.earState },
+      gown: this.gown ? { ...this.gown } : null,
+      bodyClippings: this.bodyClippings.map((c) => ({ ...c })),
+      gownClippings: this.gownClippings.map((c) => ({ ...c })),
       glasses: this.glasses ? { ...this.glasses } : null,
       accessories: this.accessories.map((a) => ({ ...a })),
       strands: this.strands.map((s) => ({
@@ -245,6 +254,9 @@ export class HairSalonEngine {
     this.stylePreset = snap.stylePreset;
     this.presetState = snap.presetState ? { ...snap.presetState } : this.defaultPresetState();
     this.earState = snap.earState ? { ...snap.earState } : this.defaultEarState();
+    this.gown = snap.gown ? { ...snap.gown } : null;
+    this.bodyClippings = snap.bodyClippings ? snap.bodyClippings.map((c) => ({ ...c })) : [];
+    this.gownClippings = snap.gownClippings ? snap.gownClippings.map((c) => ({ ...c })) : [];
     this.glasses = snap.glasses ? { ...snap.glasses } : null;
     this.accessories = snap.accessories.map((a) => ({ ...a }));
     snap.strands.forEach((st, i) => {
@@ -284,6 +296,81 @@ export class HairSalonEngine {
       };
       this.setExpression('proud', 1.2);
     }
+  }
+
+  setGown(design, color) {
+    if (!design || design === 'none') {
+      if (this.gown) {
+        // Shake all caught clippings flying off the gown for a clean reveal!
+        this.gownClippings.forEach((c) => {
+          this.pushParticle({
+            type: 'clip',
+            x: c.x,
+            y: c.y,
+            vx: (c.x < this.cx ? -1 : 1) * (5 + Math.random() * 6),
+            vy: -4 - Math.random() * 4,
+            rot: c.rot,
+            vrot: (Math.random() - 0.5) * 0.3,
+            color: c.color,
+            size: c.size,
+            life: 0.9,
+            shaken: true
+          });
+        });
+        this.gownClippings = [];
+        for (let i = 0; i < 14; i++) {
+          this.spawnSparkle(
+            this.cx + (Math.random() - 0.5) * 280,
+            this.cy + 215 + Math.random() * 110,
+            '#fff4a3'
+          );
+        }
+        this.setExpression('proud', 1.3);
+      }
+      this.gown = null;
+    } else {
+      this.gown = {
+        design,
+        color: color || (this.gown && this.gown.color) || '#ff6ba9'
+      };
+      for (let i = 0; i < 10; i++) {
+        this.spawnSparkle(
+          this.cx + (Math.random() - 0.5) * 260,
+          this.cy + 225 + Math.random() * 110,
+          this.gown.color
+        );
+      }
+      this.setExpression('happy', 0.9);
+    }
+  }
+
+  shakeOffClippings() {
+    const list = this.gown ? this.gownClippings : this.bodyClippings;
+    list.forEach((c) => {
+      this.pushParticle({
+        type: 'clip',
+        x: c.x,
+        y: c.y,
+        vx: (c.x < this.cx ? -1 : 1) * (5 + Math.random() * 6),
+        vy: -3 - Math.random() * 4,
+        rot: c.rot,
+        vrot: (Math.random() - 0.5) * 0.3,
+        color: c.color,
+        size: c.size,
+        life: 0.9,
+        shaken: true
+      });
+    });
+    if (this.gown) this.gownClippings = [];
+    else this.bodyClippings = [];
+    for (let i = 0; i < 12; i++) {
+      this.spawnSparkle(
+        this.cx + (Math.random() - 0.5) * 260,
+        this.cy + 220 + Math.random() * 110,
+        '#fff4a3'
+      );
+    }
+    this.setExpression('proud', 1.0);
   }
 
   colorAllHair(hex) {
@@ -707,6 +794,32 @@ export class HairSalonEngine {
       });
     }
 
+    // Blow or rinse stuck hair clippings off the gown/shirt with Dryer or Shower
+    if ((tool === 'dryer' || tool === 'shower') && y > this.cy + 150) {
+      const targetList = this.gown ? this.gownClippings : this.bodyClippings;
+      const blowR = tool === 'dryer' ? 125 : 85;
+      for (let i = targetList.length - 1; i >= 0; i--) {
+        const c = targetList[i];
+        if (Math.hypot(c.x - x, c.y - y) < blowR) {
+          touched = true;
+          targetList.splice(i, 1);
+          this.pushParticle({
+            type: 'clip',
+            x: c.x,
+            y: c.y,
+            vx: (c.x >= x ? 1 : -1) * (5 + Math.random() * 6),
+            vy: tool === 'dryer' ? (-3 - Math.random() * 4) : (3 + Math.random() * 3),
+            rot: c.rot,
+            vrot: (Math.random() - 0.5) * 0.25,
+            color: c.color,
+            size: c.size,
+            life: 0.8,
+            shaken: true
+          });
+        }
+      }
+    }
+
     // Ambient tool particles even if slightly outside strands
     if (tool === 'shower') {
       for (let i = 0; i < 3; i++) {
@@ -853,6 +966,17 @@ export class HairSalonEngine {
       if (p.type === 'clip') {
         p.vy += 0.42;
         p.rot += p.vrot;
+        // Let falling snipped hair land on the gown (protecting clothes!) or on the shirt
+        if (!p.shaken && p.vy > 0 && p.y > this.cy + 206 && p.y < this.H - 18) {
+          const halfW = this.gown ? 170 : 150;
+          if (Math.abs(p.x - this.cx) < halfW && Math.random() < 0.18) {
+            const dest = this.gown ? this.gownClippings : this.bodyClippings;
+            if (dest.length >= 48) dest.shift();
+            dest.push({ x: p.x, y: p.y, rot: p.rot, color: p.color, size: p.size });
+            this.particles.splice(i, 1);
+            continue;
+          }
+        }
       } else if (p.type === 'water') {
         p.vy += 0.35;
       }
@@ -874,12 +998,15 @@ export class HairSalonEngine {
     // Style-specific back buns/pigtails/ponytail
     this.drawPresetBack(ctx);
 
+    // Body, shirt/chest fur, neck, collar, and protective salon gown (so long hair drapes over the gown!)
+    this.drawBodyAndGown(ctx);
+
     // Back hair strands
     this.strands.forEach((s) => {
       if (s.layer === 'back') this.drawStrand(ctx, s);
     });
 
-    // Body, neck, head, face
+    // Head, ears, face
     this.drawCharacter(ctx);
 
     // Front hair strands
@@ -1481,15 +1608,158 @@ export class HairSalonEngine {
     ctx.restore();
   }
 
-  drawCharacter(ctx) {
+  drawClippingsList(ctx, list) {
+    if (!list || !list.length) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    list.forEach((p) => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.strokeStyle = shadeHex(p.color, 0.72);
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(-p.size / 2, 0);
+      ctx.quadraticCurveTo(0, -5, p.size / 2, 0);
+      ctx.stroke();
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 6.5;
+      ctx.beginPath();
+      ctx.moveTo(-p.size / 2, 0);
+      ctx.quadraticCurveTo(0, -5, p.size / 2, 0);
+      ctx.stroke();
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
+  drawGown(ctx) {
+    if (!this.gown) return;
+    const cx = this.cx;
+    const cy = this.cy;
+    const col = this.gown.color || '#ff6ba9';
+    const design = this.gown.design || 'plain';
+
+    ctx.save();
+
+    const traceCape = () => {
+      ctx.beginPath();
+      ctx.moveTo(cx - 205, this.H + 20);
+      ctx.quadraticCurveTo(cx - 196, cy + 188, cx - 54, cy + 178);
+      ctx.lineTo(cx + 54, cy + 178);
+      ctx.quadraticCurveTo(cx + 196, cy + 188, cx + 205, this.H + 20);
+      ctx.closePath();
+    };
+
+    // Base cape fill with soft fabric gradient
+    const grad = ctx.createLinearGradient(cx - 190, cy + 180, cx + 190, this.H);
+    grad.addColorStop(0, lightenHex(col, 0.12));
+    grad.addColorStop(0.5, col);
+    grad.addColorStop(1, shadeHex(col, 0.86));
+
+    traceCape();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Clip patterns & soft folds cleanly inside the gown
+    ctx.save();
+    traceCape();
+    ctx.clip();
+
+    // Soft fabric drape folds
+    ctx.strokeStyle = shadeHex(col, 0.78);
+    ctx.globalAlpha = 0.24;
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+    [-115, -45, 45, 115].forEach((dx) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * 0.45, cy + 195);
+      ctx.quadraticCurveTo(cx + dx * 0.9, cy + 295, cx + dx * 1.2, this.H + 10);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    // Pattern designs!
+    if (design === 'stripes') {
+      const bandW = 54;
+      for (let i = -4; i <= 4; i++) {
+        ctx.fillStyle = RAINBOW_HEX[((i + 12) % RAINBOW_HEX.length)];
+        ctx.globalAlpha = 0.75;
+        ctx.fillRect(cx + i * bandW - bandW / 2, cy + 175, bandW, this.H - cy);
+      }
+      ctx.globalAlpha = 1;
+    } else if (design === 'dots') {
+      const dotCol = col === '#ffffff' ? '#ff6ba9' : 'rgba(255, 255, 255, 0.65)';
+      ctx.fillStyle = dotCol;
+      for (let row = 0; row < 4; row++) {
+        for (let colIdx = -3; colIdx <= 3; colIdx++) {
+          const dx = cx + colIdx * 58 + (row % 2 ? 28 : 0);
+          const dy = cy + 216 + row * 54;
+          ctx.beginPath();
+          ctx.arc(dx, dy, 13, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (design === 'stars' || design === 'hearts' || design === 'paws' || design === 'sparkles') {
+      const emojiMap = {
+        stars: ['⭐', '✨'],
+        hearts: ['💖', '💕'],
+        paws: ['🐾', '🐾'],
+        sparkles: ['🌙', '✨']
+      };
+      const icons = emojiMap[design];
+      ctx.font = '32px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.88;
+      for (let row = 0; row < 4; row++) {
+        for (let colIdx = -3; colIdx <= 3; colIdx++) {
+          const dx = cx + colIdx * 62 + (row % 2 ? 30 : 0);
+          const dy = cy + 218 + row * 56;
+          ctx.fillText(icons[(row + colIdx + 10) % 2], dx, dy);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+
+    // Cape outline
+    traceCape();
+    ctx.strokeStyle = col === '#ffffff' ? '#d8c5dc' : shadeHex(col, 0.65);
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    // Snug rounded salon neckband & shiny snap clasp
+    ctx.fillStyle = col === '#ffffff' ? '#f3e6f7' : lightenHex(col, 0.22);
+    ctx.strokeStyle = col === '#ffffff' ? '#cbb2d4' : shadeHex(col, 0.62);
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.roundRect(cx - 58, cy + 168, 116, 26, 13);
+    ctx.fill();
+    ctx.stroke();
+
+    // Shiny round snap button at throat
+    ctx.fillStyle = '#ffd43b';
+    ctx.strokeStyle = '#c98a00';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy + 181, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawBodyAndGown(ctx) {
     const c = this.customer;
     const cx = this.cx;
     const cy = this.cy;
+    const isPet = c.isCat || c.isDog;
 
     ctx.save();
 
     // Shoulders & shirt (or furry body + fluffy cream chest patch for Pip & Zara!)
-    const isPet = c.isCat || c.isDog;
     const bodyCol = isPet ? c.skin : c.shirt;
     ctx.fillStyle = bodyCol;
     ctx.strokeStyle = shadeHex(bodyCol, 0.72);
@@ -1516,14 +1786,17 @@ export class HairSalonEngine {
       ctx.fill();
     }
 
-    // Neck (drawn BEFORE pet collar so collar wraps cleanly in front!)
+    // Hair clippings stuck to shirt/fur when no gown protected them
+    this.drawClippingsList(ctx, this.bodyClippings);
+
+    // Neck (drawn BEFORE pet collar & gown so they wrap cleanly in front!)
     ctx.fillStyle = c.skinShade;
     ctx.beginPath();
     ctx.roundRect(cx - 34, cy + 135, 68, 72, 26);
     ctx.fill();
 
-    // Pet collar & shiny golden bell (Pip) or dog tag (Zara) in front of neck
-    if (isPet) {
+    // Pet collar & shiny golden bell (Pip) or dog tag (Zara) when not covered by a gown
+    if (isPet && !this.gown) {
       const collarCol = c.isDog ? '#29c7b8' : '#ff5ca8';
       ctx.fillStyle = collarCol;
       ctx.strokeStyle = shadeHex(collarCol, 0.72);
@@ -1532,7 +1805,6 @@ export class HairSalonEngine {
       ctx.roundRect(cx - 56, cy + 172, 112, 24, 12);
       ctx.fill();
       ctx.stroke();
-      // Shiny golden bell / dog tag
       ctx.fillStyle = '#ffd43b';
       ctx.strokeStyle = '#c98a00';
       ctx.lineWidth = 4;
@@ -1546,13 +1818,29 @@ export class HairSalonEngine {
         ctx.arc(cx, cy + 208, 4.5, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // Cute tiny paw/heart shine on dog tag
         ctx.fillStyle = '#fff5b8';
         ctx.beginPath();
         ctx.arc(cx - 5, cy + 199, 4.5, 0, Math.PI * 2);
         ctx.fill();
       }
     }
+
+    // Protective salon gown + caught hair clippings!
+    if (this.gown) {
+      this.drawGown(ctx);
+      this.drawClippingsList(ctx, this.gownClippings);
+    }
+
+    ctx.restore();
+  }
+
+  drawCharacter(ctx) {
+    const c = this.customer;
+    const cx = this.cx;
+    const cy = this.cy;
+    const isPet = c.isCat || c.isDog;
+
+    ctx.save();
 
     // Monster cute striped horns!
     if (c.isMonster) {
